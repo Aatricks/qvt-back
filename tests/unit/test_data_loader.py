@@ -1,0 +1,20 @@
+from pathlib import Path
+
+import pandas as pd
+import pytest
+
+from src.services import data_loader
+
+FIXTURES = Path(__file__).parent.parent / "fixtures"
+
+
+def test_read_csv_with_autodetect():
+    data = (FIXTURES / "hr_valid.csv").read_bytes()
+    df = data_loader.read_bytes_to_df(data, "hr_valid.csv")
+    assert not df.empty
+    assert {"year", "absenteeism_rate", "turnover_rate"}.issubset(df.columns)
+
+
+def test_reject_unsupported_extension():
+    with pytest.raises(data_loader.UnsupportedFileType):
+        data_loader.read_bytes_to_df(b"bad", "data.txt")
