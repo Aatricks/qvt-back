@@ -1,4 +1,4 @@
-from typing import Iterable, List, Sequence
+from typing import Iterable, List, Sequence, Union
 
 import pandas as pd
 
@@ -16,13 +16,20 @@ def enforce_dimensions(df: pd.DataFrame, max_rows: int, max_columns: int) -> Non
         )
 
 
-def check_likert_range(df: pd.DataFrame, column: str = "response_value") -> List[str]:
-    if column not in df.columns:
-        return [column]
-    invalid = df[(df[column] < 1) | (df[column] > 5)]
-    if invalid.empty:
-        return []
-    return [f"{column} out of range 1-5 in {len(invalid)} rows"]
+def check_likert_range(
+    df: pd.DataFrame, column: Union[str, Sequence[str]] = "response_value"
+) -> List[str]:
+    columns = [column] if isinstance(column, str) else list(column)
+    issues: List[str] = []
+    for col in columns:
+        if col not in df.columns:
+            issues.append(col)
+            continue
+        numeric = pd.to_numeric(df[col], errors="coerce")
+        invalid = df[(numeric < 1) | (numeric > 5)]
+        if not invalid.empty:
+            issues.append(f"{col} out of range 1-5 in {len(invalid)} rows")
+    return issues
 
 
 def ensure_numeric(df: pd.DataFrame, columns: Sequence[str]) -> List[str]:

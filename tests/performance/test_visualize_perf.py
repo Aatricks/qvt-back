@@ -15,10 +15,16 @@ def test_visualize_time_budget(client):
     # Generate synthetic HR dataset in-memory
     df = pd.DataFrame(
         {
-            "year": [2024] * ROWS,
-            "absenteeism_rate": range(ROWS),
-            "turnover_rate": range(ROWS),
-            "department": ["Ops"] * ROWS,
+            "ID": range(ROWS),
+            "Sexe": [1] * ROWS,
+            "Age": [40] * ROWS,
+            "Contrat": [1] * ROWS,
+            "Temps": [1] * ROWS,
+            "Encadre": [1] * ROWS,
+            "Ancienne": [5] * ROWS,
+            "Secteur": [1] * ROWS,
+            "TailleOr": [2] * ROWS,
+            "PGC2": [i % 5 + 1 for i in range(ROWS)],
         }
     )
     buf = io.StringIO()
@@ -27,7 +33,7 @@ def test_visualize_time_budget(client):
 
     start = time.perf_counter()
     response = client.post(
-        "/api/visualize/time_series",
+        "/api/visualize/likert_distribution",
         files={"hr_file": ("hr_large.csv", data, "text/csv")},
     )
     elapsed_ms = (time.perf_counter() - start) * 1000

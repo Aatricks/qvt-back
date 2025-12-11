@@ -1,7 +1,17 @@
 from typing import List, Set
 
-HR_REQUIRED_COLUMNS: Set[str] = {"year", "absenteeism_rate", "turnover_rate"}
-SURVEY_REQUIRED_COLUMNS: Set[str] = {"respondent_id", "question_label", "response_value"}
+HR_REQUIRED_COLUMNS: Set[str] = {
+    "ID",
+    "Sexe",
+    "Age",
+    "Contrat",
+    "Temps",
+    "Encadre",
+    "Ancienne",
+    "Secteur",
+    "TailleOr",
+}
+SURVEY_REQUIRED_COLUMNS: Set[str] = set()
 
 
 def required_hr_columns() -> List[str]:

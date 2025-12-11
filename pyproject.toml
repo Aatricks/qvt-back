@@ -11,8 +11,10 @@ dependencies = [
   "fastapi>=0.110",
   "uvicorn[standard]>=0.23",
   "pydantic>=1.10,<3",
+  "pydantic-settings>=2.2",
   "pandas>=2.1",
   "numpy>=1.26",
+  "scipy>=1.11",
   "altair>=5.2",
   "python-multipart>=0.0.9",
 ]
@@ -39,3 +41,9 @@ target-version = ["py310"]
 testpaths = ["tests"]
 addopts = "-q"
 pythonpath = ["src"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "pyproject.toml", "README.md"]

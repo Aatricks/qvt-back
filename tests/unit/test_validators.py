@@ -10,6 +10,6 @@ def test_missing_columns_detects_absent_fields():
 
 
 def test_likert_range_flags_out_of_bounds():
-    df = pd.DataFrame({"response_value": [1, 3, 6]})
-    issues = validators.check_likert_range(df)
+    df = pd.DataFrame({"Q1": [1, 3, 6]})
+    issues = validators.check_likert_range(df, ["Q1"])
     assert issues

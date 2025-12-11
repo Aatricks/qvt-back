@@ -18,9 +18,11 @@ class CorrelationMatrixStrategy(IVisualizationStrategy):
             if key in hr_df.columns:
                 hr_df = hr_df[hr_df[key] == value]
 
-        numeric_cols: List[str] = config.get(
-            "numeric_fields", ["absenteeism_rate", "turnover_rate"]
-        )
+        numeric_cols: List[str] = config.get("numeric_fields")
+        if not numeric_cols:
+            numeric_cols = hr_df.select_dtypes(include="number").columns.tolist()
+        if not numeric_cols:
+            raise ValueError("No numeric columns available for correlation matrix")
         numeric = hr_df[numeric_cols].apply(pd.to_numeric, errors="coerce").dropna()
         corr = numeric.corr()
         corr_reset = corr.stack().reset_index()

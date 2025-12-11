@@ -9,6 +9,7 @@ from src.config.settings import settings
 from src.schemas.datasets import HR_REQUIRED_COLUMNS, SURVEY_REQUIRED_COLUMNS
 from src.schemas.visualize import ChartRequest
 from src.services import data_loader
+from src.services.survey_utils import detect_likert_columns
 from src.services.validators import check_likert_range, missing_columns
 from src.viz.registry import factory
 import src.viz  # noqa: F401 ensures default strategies registered
@@ -72,7 +73,12 @@ async def generate_chart(
                 message="Missing required survey columns",
                 details=missing_survey,
             )
-        likert_errors = check_likert_range(survey_df, column="response_value")
+    elif detect_likert_columns(hr_df):
+        # Single-file mode: reuse HR dataset for survey visualizations
+        survey_df = hr_df
+
+    if survey_df is not None:
+        likert_errors = check_likert_range(survey_df, column=detect_likert_columns(survey_df))
         if likert_errors:
             raise ValidationFailure(
                 code="invalid_value_range",

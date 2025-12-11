@@ -7,15 +7,12 @@ from src.viz.registry import factory
 FIXTURES = Path(__file__).parent.parent / "fixtures"
 
 
-@pytest.mark.parametrize("chart_key", ["time_series", "likert_distribution", "correlation_matrix"])
+@pytest.mark.parametrize(
+    "chart_key",
+    ["likert_distribution", "distribution_anomalies", "anova_significance"],
+)
 def test_visualize_success(client, chart_key):
-    files = {"hr_file": ("hr_valid.csv", (FIXTURES / "hr_valid.csv").read_bytes(), "text/csv")}
-    if chart_key == "likert_distribution":
-        files["survey_file"] = (
-            "survey_valid.csv",
-            (FIXTURES / "survey_valid.csv").read_bytes(),
-            "text/csv",
-        )
+    files = {"hr_file": ("pov_sample.csv", (FIXTURES / "pov_sample.csv").read_bytes(), "text/csv")}
     response = client.post(f"/api/visualize/{chart_key}", files=files)
     assert response.status_code == 200
     payload = response.json()
@@ -26,7 +23,7 @@ def test_visualize_success(client, chart_key):
 def test_visualize_unknown_key(client):
     response = client.post(
         "/api/visualize/unknown",
-        files={"hr_file": ("hr_valid.csv", (FIXTURES / "hr_valid.csv").read_bytes(), "text/csv")},
+        files={"hr_file": ("pov_sample.csv", (FIXTURES / "pov_sample.csv").read_bytes(), "text/csv")},
     )
     assert response.status_code == 404
     payload = response.json()

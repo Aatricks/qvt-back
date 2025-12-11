@@ -17,8 +17,15 @@ class TimeSeriesStrategy(IVisualizationStrategy):
         self, data: Dict[str, pd.DataFrame], config: Dict[str, Any], filters: Dict[str, Any], settings: Any
     ) -> Dict[str, Any]:
         hr_df = data["hr"]
-        metric = config.get("measure_field", "absenteeism_rate")
-        time_field = config.get("time_field", "year")
+        metric = config.get("measure_field")
+        if not metric or metric not in hr_df.columns:
+            numeric_cols = hr_df.select_dtypes(include="number").columns.tolist()
+            if not numeric_cols:
+                raise ValueError("No numeric metric available for time series")
+            metric = numeric_cols[0]
+        time_field = config.get("time_field", "ID" if "ID" in hr_df.columns else None)
+        if not time_field or time_field not in hr_df.columns:
+            time_field = hr_df.columns[0]
 
         df = hr_df.copy()
         for key, value in (filters or {}).items():
@@ -30,9 +37,9 @@ class TimeSeriesStrategy(IVisualizationStrategy):
             alt.Chart(df)
             .mark_line(point=True)
             .encode(
-                x=alt.X(f"{time_field}:O", title="Period"),
-                y=alt.Y(f"{metric}:Q", title=metric.replace("_", " ").title()),
-                tooltip=[time_field, metric],
+                 x=alt.X(f"{time_field}:O", title="Période"),
+                 y=alt.Y(f"{metric}:Q", title=metric.replace("_", " ").title()),
+                 tooltip=[time_field, metric],
             )
         )
         return chart.to_dict()
