@@ -1,7 +1,8 @@
 import json
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, File, Form, UploadFile, status
+from fastapi.responses import JSONResponse
 
 from src.schemas.visualize import ChartRequest
 from src.services import visualize_service
@@ -34,7 +35,7 @@ async def visualize(
             details=[str(exc)],
             supported_keys=factory.list_keys(),
         )
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error)
+        return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content=error)
 
     request = ChartRequest(
         chart_key=chart_type,
@@ -53,7 +54,7 @@ async def visualize(
             details=[],
             supported_keys=factory.list_keys(),
         )
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=error)
+        return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content=error)
     except visualize_service.ValidationFailure as exc:
         error = build_error(
             code=exc.code,
@@ -61,4 +62,4 @@ async def visualize(
             details=exc.details,
             supported_keys=factory.list_keys(),
         )
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error)
+        return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content=error)

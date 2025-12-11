@@ -14,4 +14,4 @@ def build_error(
         message=message,
         details=details or [],
         supported_chart_keys=supported_keys,
-    ).dict()
+    ).model_dump()

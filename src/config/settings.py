@@ -1,4 +1,5 @@
-from pydantic import BaseSettings, Field
+from pydantic_settings import BaseSettings
+from pydantic import Field, ConfigDict
 
 
 class Settings(BaseSettings):
@@ -7,9 +8,7 @@ class Settings(BaseSettings):
     request_timeout_seconds: int = Field(5, description="Timeout guard for request processing")
     log_level: str = Field("INFO", description="Logging level")
 
-    class Config:
-        env_prefix = "QVCTI_"
-        case_sensitive = False
+    model_config = ConfigDict(env_prefix="QVCTI_", case_sensitive=False)
 
 
 settings = Settings()
