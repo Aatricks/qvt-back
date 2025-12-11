@@ -6,3 +6,4 @@ def test_supported_keys_listed():
     assert "likert_distribution" in keys
     assert "distribution_anomalies" in keys
     assert "anova_significance" in keys
+    assert "dimension_summary" in keys

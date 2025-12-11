@@ -4,8 +4,12 @@ import pandas as pd
 
 
 def missing_columns(df: pd.DataFrame, required: Iterable[str]) -> List[str]:
-    required_set = {col for col in required}
-    return sorted(list(required_set.difference(set(df.columns))))
+    df_norm = {str(col).strip().upper() for col in df.columns}
+    missing = []
+    for col in required:
+        if str(col).strip().upper() not in df_norm:
+            missing.append(col)
+    return sorted(missing)
 
 
 def enforce_dimensions(df: pd.DataFrame, max_rows: int, max_columns: int) -> None:

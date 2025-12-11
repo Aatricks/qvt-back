@@ -41,8 +41,17 @@ def _normalize_column_name(col: str) -> str:
     return str(col).strip()
 
 
+def _extract_prefix(column: str) -> str:
+    upper = _normalize_column_name(column).upper()
+    for prefix in LIKERT_PREFIX_LABELS.keys():
+        if upper.startswith(prefix):
+            return prefix
+    return upper.rstrip("0123456789")
+
+
 def available_demographics(df: pd.DataFrame) -> List[str]:
-    return [col for col in SOCIO_COLUMNS if col in df.columns]
+    normalized = {_normalize_column_name(col).upper(): col for col in df.columns}
+    return [normalized[name.upper()] for name in SOCIO_COLUMNS if name.upper() in normalized]
 
 
 def detect_likert_columns(df: pd.DataFrame) -> List[str]:
@@ -74,6 +83,7 @@ def to_likert_long(df: pd.DataFrame, likert_columns: Sequence[str] | None = None
         var_name="question_label",
         value_name="response_value",
     )
+    melted["dimension_prefix"] = melted["question_label"].apply(_extract_prefix)
     melted["question_label"] = melted["question_label"].apply(friendly_question_label)
     return melted
 
