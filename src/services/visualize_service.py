@@ -141,12 +141,19 @@ async def generate_chart(
                 details=likert_errors,
             )
 
+    # Apply filters robustly (handling string vs int mismatches) before passing to strategy
+    # This ensures that frontend filters (always strings) match backend data (mixed types).
+    filters = request.filters or {}
+    hr_df = _apply_filters(hr_df, filters)
+    if survey_df is not None:
+        survey_df = _apply_filters(survey_df, filters)
+
     with timed("generate_spec"):
         try:
             spec = strategy.generate(
                 data={"hr": hr_df, "survey": survey_df},
                 config=request.config or {},
-                filters=request.filters or {},
+                filters={},  # Filters already applied
                 settings=settings,
             )
         except ValueError as exc:
@@ -164,3 +171,24 @@ async def generate_chart(
         "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "spec": spec,
     }
+
+
+def _apply_filters(df: pd.DataFrame, filters: Dict[str, Any]) -> pd.DataFrame:
+    """Filter dataframe robustly, comparing values as strings."""
+    if not filters or df.empty:
+        return df
+    
+    # We don't copy immediately; pandas slicing returns a new object usually, 
+    # but let's be safe if we modify it. 
+    # Actually, we are just subsetting, so no deep copy needed unless we mutate.
+    
+    for key, value in filters.items():
+        if key not in df.columns:
+            continue
+        
+        # Cast column to string and strip whitespace for robust comparison against frontend string values
+        # Note: this might be expensive for very large DFs, but ensures correctness.
+        mask = df[key].astype(str).str.strip() == str(value).strip()
+        df = df[mask]
+        
+    return df
