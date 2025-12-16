@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 import pandas as pd
@@ -13,6 +13,51 @@ from src.services.survey_utils import detect_likert_columns
 from src.services.validators import check_likert_range, missing_columns
 from src.viz.registry import factory
 import src.viz  # noqa: F401 ensures default strategies registered
+
+
+# Chart keys that require survey-style Likert data.
+# Survey data can be provided either as:
+#  - wide format (one row per respondent + many Likert item columns like PGC2, EPUI1, ...), or
+#  - long format (question_label + response_value).
+SURVEY_CHART_KEYS = {
+    "likert_distribution",
+    "likert_item_heatmap",
+    "distribution_anomalies",
+    "anova_significance",
+    "dimension_summary",
+    "dimension_heatmap",
+    "dimension_boxplot",
+    "dimension_mean_std_scatter",
+    "dimension_ci_bars",
+    "scatter_regression",
+    "eng_epui_quadrants",
+    "importance_performance_matrix",
+    # extension point
+    "example_new_chart",
+}
+
+
+def _has_long_survey_columns(df: pd.DataFrame) -> bool:
+    df_norm = {str(c).strip().upper() for c in df.columns}
+    return "QUESTION_LABEL" in df_norm and "RESPONSE_VALUE" in df_norm
+
+
+def _require_survey_data_or_fail(hr_df: pd.DataFrame, survey_df: Optional[pd.DataFrame], chart_key: str) -> None:
+    if chart_key not in SURVEY_CHART_KEYS:
+        return
+    if survey_df is not None:
+        return
+    # In single-file mode we can reuse hr_df as survey data only if it looks like survey.
+    if detect_likert_columns(hr_df) or _has_long_survey_columns(hr_df):
+        return
+    raise ValidationFailure(
+        code="missing_required_columns",
+        message="Survey data required for this chart",
+        details=[
+            "Provide 'survey_file' (wide Likert columns like PGC2/EPUI1... or long columns question_label/response_value)",
+            "OR upload a single file containing Likert columns (e.g., PGC2, COM3, ENG1, EPUI1...) as 'hr_file'",
+        ],
+    )
 
 
 class UnknownChartKeyError(KeyError):
@@ -73,12 +118,22 @@ async def generate_chart(
                 message="Missing required survey columns",
                 details=missing_survey,
             )
-    elif detect_likert_columns(hr_df):
-        # Single-file mode: reuse HR dataset for survey visualizations
+
+    # Single-file mode: reuse HR dataset for survey visualizations when it contains Likert columns
+    if survey_df is None and (detect_likert_columns(hr_df) or _has_long_survey_columns(hr_df)):
         survey_df = hr_df
 
+    # Enforce survey presence for survey-based charts (before strategy execution)
+    _require_survey_data_or_fail(hr_df=hr_df, survey_df=survey_df, chart_key=request.chart_key)
+
     if survey_df is not None:
-        likert_errors = check_likert_range(survey_df, column=detect_likert_columns(survey_df))
+        # Validate Likert range in both supported survey formats.
+        if _has_long_survey_columns(survey_df):
+            likert_errors = check_likert_range(survey_df, column="response_value")
+        else:
+            likert_cols = detect_likert_columns(survey_df)
+            likert_errors = check_likert_range(survey_df, column=likert_cols) if likert_cols else []
+
         if likert_errors:
             raise ValidationFailure(
                 code="invalid_value_range",
@@ -87,16 +142,25 @@ async def generate_chart(
             )
 
     with timed("generate_spec"):
-        spec = strategy.generate(
-            data={"hr": hr_df, "survey": survey_df},
-            config=request.config or {},
-            filters=request.filters or {},
-            settings=settings,
-        )
+        try:
+            spec = strategy.generate(
+                data={"hr": hr_df, "survey": survey_df},
+                config=request.config or {},
+                filters=request.filters or {},
+                settings=settings,
+            )
+        except ValueError as exc:
+            # Convert strategy ValueError into a structured validation error so the API returns a 400.
+            # Keep error codes aligned with the public contract.
+            raise ValidationFailure(
+                code="payload_error",
+                message="Visualization generation failed",
+                details=[str(exc)],
+            ) from exc
 
     log_event("chart_generated", chart_key=request.chart_key)
     return {
         "chart_key": request.chart_key,
-        "generated_at": datetime.utcnow().isoformat() + "Z",
+        "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "spec": spec,
     }

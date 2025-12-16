@@ -2,7 +2,7 @@ import altair as alt
 
 
 def apply_theme() -> None:
-    alt.themes.enable("none")
+    alt.theme.enable("none")
     alt.data_transformers.disable_max_rows()
 
 

@@ -7,3 +7,4 @@ def test_supported_keys_listed():
     assert "distribution_anomalies" in keys
     assert "anova_significance" in keys
     assert "dimension_summary" in keys
+    assert "importance_performance_matrix" in keys

@@ -42,7 +42,7 @@ class AnovaSignificanceStrategy(IVisualizationStrategy):
                 if demo not in q_df.columns:
                     continue
                 split = q_df.dropna(subset=[demo])
-                groups = [group["response_value"].values for _, group in split.groupby(demo)]
+                groups = [group["response_value"].values for _, group in split.groupby(demo, observed=False)]
                 groups = [g for g in groups if len(g) >= 2]
                 if len(groups) < 2:
                     continue
@@ -65,8 +65,10 @@ class AnovaSignificanceStrategy(IVisualizationStrategy):
         top = sorted(significant_combos, key=lambda r: r["p_value"])[:top_n]
         plot_rows: List[Dict[str, Any]] = []
         for combo in top:
-            subset = long_df.dropna(subset=[combo["group_variable"]])
-            for group_value, group_df in subset.groupby(combo["group_variable"]):
+            subset = long_df[long_df["question_label"] == combo["question_label"]].dropna(
+                subset=[combo["group_variable"]]
+            )
+            for group_value, group_df in subset.groupby(combo["group_variable"], observed=False):
                 plot_rows.append(
                     {
                         "question_label": combo["question_label"],

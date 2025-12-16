@@ -5,6 +5,7 @@ import pandas as pd
 
 from src.viz.base import IVisualizationStrategy
 from src.viz.theme import apply_theme
+from src.config.observability import log_event
 
 
 class BenchmarkBulletStrategy(IVisualizationStrategy):
@@ -40,13 +41,56 @@ class BenchmarkBulletStrategy(IVisualizationStrategy):
         if hr_df.empty:
             raise ValueError("Dataset vide après filtrage pour le bullet chart")
 
+        # Determine metric field: prefer user-provided, otherwise try to auto-detect a sensible numeric column
         metric_field: Optional[str] = config.get("metric_field")
-        if not metric_field or metric_field not in hr_df.columns:
-            raise ValueError("metric_field est requis et doit exister dans le dataset")
+        if (not metric_field) or (metric_field not in hr_df.columns):
+            # Heuristic detection from numeric columns
+            numeric_cols = hr_df.select_dtypes(include="number").columns.tolist()
+            candidates = []
+            for token in ["absentee", "absence", "rate", "score", "metric"]:
+                for c in numeric_cols:
+                    if token in c.lower():
+                        candidates.append(c)
+            # Fallback to any numeric column
+            if not candidates and numeric_cols:
+                candidates = numeric_cols
+            if candidates:
+                metric_field = candidates[0]
+            else:
+                raise ValueError("metric_field est requis et doit exister dans le dataset")
 
+        # Determine benchmark field: if provided, validate; otherwise try to find a different numeric column
         benchmark_field: Optional[str] = config.get("benchmark_field")
+        if benchmark_field and benchmark_field not in hr_df.columns:
+            raise ValueError(f"Colonne '{benchmark_field}' introuvable dans le dataset")
+        if not benchmark_field:
+            numeric_cols = hr_df.select_dtypes(include="number").columns.tolist()
+            possible = [c for c in numeric_cols if c != metric_field]
+            bf = None
+            for token in ["turnover", "benchmark", "target", "rate"]:
+                for c in possible:
+                    if token in c.lower():
+                        bf = c
+                        break
+                if bf:
+                    break
+            if not bf and possible:
+                bf = possible[0]
+            benchmark_field = bf
+
         target_field: Optional[str] = config.get("target_field")
         group_field: Optional[str] = config.get("group_field")
+
+        # Log the selected fields for observability (harmless if logging fails)
+        try:
+            log_event(
+                "benchmark_bullet.selected_fields",
+                metric_field=metric_field,
+                benchmark_field=benchmark_field,
+                target_field=target_field,
+            )
+        except Exception:
+            pass
 
         # Vérification des champs optionnels
         for fld in [benchmark_field, target_field]:

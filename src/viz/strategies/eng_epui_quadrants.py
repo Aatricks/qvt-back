@@ -47,6 +47,20 @@ class EngEpuiQuadrantsStrategy(IVisualizationStrategy):
         if df.empty:
             raise ValueError("Dataset vide après filtrage pour les quadrants ENG/EPUI")
 
+        # Compute EPUI and ENG means if not present
+        if "EPUI" not in df.columns:
+            epui_cols = [col for col in df.columns if col.startswith("EPUI")]
+            if epui_cols:
+                df["EPUI"] = df[epui_cols].mean(axis=1)
+            else:
+                raise ValueError("No EPUI columns found to compute mean")
+        if "ENG" not in df.columns:
+            eng_cols = [col for col in df.columns if col.startswith("ENG")]
+            if eng_cols:
+                df["ENG"] = df[eng_cols].mean(axis=1)
+            else:
+                raise ValueError("No ENG columns found to compute mean")
+
         x_field = config.get("x_field", "EPUI")
         y_field = config.get("y_field", "ENG")
 

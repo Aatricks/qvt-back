@@ -1,16 +1,6 @@
 from typing import List, Set
 
-HR_REQUIRED_COLUMNS: Set[str] = {
-    "ID",
-    "Sexe",
-    "Age",
-    "Contrat",
-    "Temps",
-    "Encadre",
-    "Ancienne",
-    "Secteur",
-    "TailleOr",
-}
+HR_REQUIRED_COLUMNS: Set[str] = set()
 SURVEY_REQUIRED_COLUMNS: Set[str] = set()
 
 

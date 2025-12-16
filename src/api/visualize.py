@@ -8,6 +8,7 @@ from src.schemas.visualize import ChartRequest
 from src.services import visualize_service
 from src.services.error_builder import build_error
 from src.viz.registry import factory
+from src.config.observability import log_event
 
 router = APIRouter(tags=["visualize"])
 
@@ -36,6 +37,18 @@ async def visualize(
             supported_keys=factory.list_keys(),
         )
         return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content=error)
+
+    # Debug log: record parsed filters/config for troubleshooting (non-blocking)
+    try:
+        log_event(
+            "visualize.request_parsed",
+            chart_key=chart_type,
+            filters=parsed_filters,
+            config=parsed_config,
+        )
+    except Exception:
+        # Swallow any logging errors so they don't affect the API response
+        pass
 
     request = ChartRequest(
         chart_key=chart_type,

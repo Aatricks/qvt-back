@@ -9,7 +9,13 @@ FIXTURES = Path(__file__).parent.parent / "fixtures"
 
 @pytest.mark.parametrize(
     "chart_key",
-    ["likert_distribution", "distribution_anomalies", "anova_significance", "dimension_summary"],
+    [
+        "likert_distribution",
+        "distribution_anomalies",
+        "anova_significance",
+        "dimension_summary",
+        "importance_performance_matrix",
+    ],
 )
 def test_visualize_success(client, chart_key):
     files = {"hr_file": ("pov_sample.csv", (FIXTURES / "pov_sample.csv").read_bytes(), "text/csv")}

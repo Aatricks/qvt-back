@@ -102,7 +102,7 @@ class ScatterRegressionStrategy(IVisualizationStrategy):
         if bool(config.get("regression", True)):
             method = config.get("method", "linear")
             order = config.get("order")
-            ci = bool(config.get("ci", True))
+            ci = bool(config.get("ci", False))
 
             regression_kwargs: Dict[str, Any] = {"method": method}
             if order is not None:

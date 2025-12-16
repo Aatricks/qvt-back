@@ -72,10 +72,18 @@ def friendly_question_label(column: str) -> str:
     return column
 
 
-def to_likert_long(df: pd.DataFrame, likert_columns: Sequence[str] | None = None) -> pd.DataFrame:
+def to_likert_long(
+    df: pd.DataFrame,
+    likert_columns: Sequence[str] | None = None,
+    extra_id_vars: Sequence[str] | None = None,
+) -> pd.DataFrame:
     likert_cols = list(likert_columns) if likert_columns else detect_likert_columns(df)
     id_vars = available_demographics(df)
-    if "AgeClasse" in df.columns:
+    if extra_id_vars:
+        for col in extra_id_vars:
+            if col in df.columns and col not in id_vars:
+                id_vars.append(col)
+    if "AgeClasse" in df.columns and "AgeClasse" not in id_vars:
         id_vars = [*id_vars, "AgeClasse"]
     melted = df.melt(
         id_vars=id_vars,

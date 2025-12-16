@@ -23,7 +23,28 @@ class TimeSeriesStrategy(IVisualizationStrategy):
             if not numeric_cols:
                 raise ValueError("No numeric metric available for time series")
             metric = numeric_cols[0]
-        time_field = config.get("time_field", "ID" if "ID" in hr_df.columns else None)
+        time_field = config.get("time_field")
+
+        # Heuristic: prefer an explicit time column if present.
+        if not time_field:
+            preferred = [
+                "year",
+                "annee",
+                "année",
+                "date",
+                "period",
+                "periode",
+                "période",
+                "month",
+                "mois",
+                "id",
+            ]
+            lower_to_actual = {str(c).strip().lower(): c for c in hr_df.columns}
+            for key in preferred:
+                if key in lower_to_actual:
+                    time_field = lower_to_actual[key]
+                    break
+
         if not time_field or time_field not in hr_df.columns:
             time_field = hr_df.columns[0]
 

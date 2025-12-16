@@ -4,7 +4,9 @@ import altair as alt
 import pandas as pd
 
 from src.viz.base import IVisualizationStrategy
+from src.services.survey_utils import add_age_band, detect_likert_columns
 from src.viz.theme import apply_theme
+from src.config.observability import log_event
 
 
 class CorrelationMatrixStrategy(IVisualizationStrategy):
@@ -18,11 +20,24 @@ class CorrelationMatrixStrategy(IVisualizationStrategy):
             if key in hr_df.columns:
                 hr_df = hr_df[hr_df[key] == value]
 
-        numeric_cols: List[str] = config.get("numeric_fields")
-        if not numeric_cols:
+        # If the user provided numeric_fields in config, keep only those present in the dataset.
+        # If none remain, fall back to auto-detected numeric columns.
+        requested: List[str] = config.get("numeric_fields") or []
+        if requested:
+            numeric_cols = [c for c in requested if c in hr_df.columns]
+            missing = [c for c in requested if c not in hr_df.columns]
+            if missing:
+                # Log which requested fields were ignored so we can troubleshoot datasets
+                try:
+                    log_event("correlation_matrix.ignored_fields", requested=requested, missing=missing)
+                except Exception:
+                    pass
+        else:
             numeric_cols = hr_df.select_dtypes(include="number").columns.tolist()
+
         if not numeric_cols:
-            raise ValueError("No numeric columns available for correlation matrix")
+            raise ValueError("No numeric columns available for correlation matrix after filtering requested fields")
+
         numeric = hr_df[numeric_cols].apply(pd.to_numeric, errors="coerce").dropna()
         corr = numeric.corr()
         corr_reset = corr.stack().reset_index()

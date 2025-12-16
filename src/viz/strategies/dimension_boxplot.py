@@ -97,31 +97,21 @@ class DimensionBoxplotStrategy(IVisualizationStrategy):
 
         domain = config.get("likert_domain", [1, 5])
         show_outliers = bool(config.get("show_outliers", True))
-        facet_columns = int(config.get("facet_columns", 3))
 
         apply_theme()
-        base = (
+        chart = (
             alt.Chart(long_df)
             .mark_boxplot(outliers=show_outliers)
             .encode(
-                x=alt.X(f"{group_field}:N", title=group_field),
-                y=alt.Y("response_value:Q", title="Réponse (1-5)", scale=alt.Scale(domain=domain)),
-                color=alt.Color(f"{group_field}:N", legend=None),
+                x=alt.X("response_value:Q", title="Réponse (1-5)", scale=alt.Scale(domain=domain)),
+                y=alt.Y("dimension_label:N", title="Dimension QVT"),
+                color=alt.Color(f"{group_field}:N", title=group_field),
                 tooltip=[
                     "dimension_label",
                     group_field,
                     alt.Tooltip("response_value:Q", format=".2f", title="Valeur"),
                 ],
             )
-        )
-
-        chart = base.facet(
-            column=alt.Column(
-                "dimension_label:N",
-                title="Dimension QVT",
-                header=alt.Header(labelOrient="bottom"),
-            ),
-            columns=facet_columns,
         )
 
         return chart.to_dict()
