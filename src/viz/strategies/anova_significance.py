@@ -61,7 +61,8 @@ class AnovaSignificanceStrategy(IVisualizationStrategy):
         if not significant_combos:
             raise ValueError("No significant differences detected")
 
-        top_n = config.get("top_n", 5)
+        top_n = int(config.get("top_n", 5))
+        columns = int(config.get("columns", 2))
         top = sorted(significant_combos, key=lambda r: r["p_value"])[:top_n]
         plot_rows: List[Dict[str, Any]] = []
         for combo in top:
@@ -82,22 +83,39 @@ class AnovaSignificanceStrategy(IVisualizationStrategy):
 
         chart_df = pd.DataFrame(plot_rows)
         apply_theme()
-        chart = (
-            alt.Chart(chart_df)
-            .mark_bar()
-            .encode(
-                x=alt.X("group_value:N", title="Groupe"),
-                y=alt.Y("mean_response:Q", title="Moyenne de réponse"),
-                color=alt.Color("group_variable:N", title="Variable"),
-                column=alt.Column("question_label:N", title="Question", spacing=8),
-                tooltip=[
-                    "question_label",
-                    "group_variable",
-                    "group_value",
-                    alt.Tooltip("mean_response:Q", format=".2f"),
-                    alt.Tooltip("p_value:Q", format=".3f"),
-                    alt.Tooltip("f_stat:Q", format=".2f"),
-                ],
+
+        # Build small multiples without a single long row of facets.
+        # We concatenate per-question charts and wrap them into a grid.
+        charts: List[alt.Chart] = []
+        for q in chart_df["question_label"].dropna().unique().tolist():
+            sub = chart_df[chart_df["question_label"] == q].copy()
+            if sub.empty:
+                continue
+            gv = str(sub["group_variable"].iloc[0]) if "group_variable" in sub.columns else "Groupe"
+            pv = float(sub["p_value"].iloc[0]) if "p_value" in sub.columns and not sub["p_value"].empty else float("nan")
+            title = f"{q} — {gv} (p={pv:.3g})" if pv == pv else f"{q} — {gv}"
+
+            c = (
+                alt.Chart(sub, title=title)
+                .mark_bar()
+                .encode(
+                    x=alt.X("group_value:N", title="Groupe", axis=alt.Axis(labelAngle=0, labelLimit=80)),
+                    y=alt.Y("mean_response:Q", title="Moyenne", scale=alt.Scale(domain=[0, 5])),
+                    color=alt.Color("group_value:N", title="Groupe", legend=None),
+                    tooltip=[
+                        alt.Tooltip("question_label:N", title="Question"),
+                        alt.Tooltip("group_variable:N", title="Variable"),
+                        alt.Tooltip("group_value:N", title="Groupe"),
+                        alt.Tooltip("mean_response:Q", title="Moyenne", format=".2f"),
+                        alt.Tooltip("p_value:Q", title="p-value", format=".3f"),
+                        alt.Tooltip("f_stat:Q", title="F", format=".2f"),
+                    ],
+                )
+                .properties(width=220, height=160)
             )
-        )
-        return chart.to_dict()
+            charts.append(c)
+
+        if not charts:
+            raise ValueError("No significant differences detected")
+
+        return alt.concat(*charts, columns=columns).to_dict()

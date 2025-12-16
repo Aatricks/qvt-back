@@ -146,12 +146,13 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
         x = alt.X(
             "mean_score:Q",
             title="Score moyen (1-5)",
-            scale=alt.Scale(domain=[lo, hi]),
+            scale=alt.Scale(domain=[0, hi]),
         )
         y = alt.Y(
             "dimension_label:N",
             title="Dimension QVCT",
             sort=alt.SortField(field="overall_mean", order="descending"),
+            axis=alt.Axis(labelLimit=260, labelPadding=8),
         )
 
         tooltip = [
@@ -171,7 +172,7 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
         if segment_field:
             eb = base.mark_errorbar().encode(
                 y=y,
-                x=alt.X("lower:Q", scale=alt.Scale(domain=[lo, hi])),
+                x=alt.X("lower:Q", scale=alt.Scale(domain=[0, hi])),
                 x2="upper:Q",
                 color=alt.Color(f"{segment_field}:N", title=segment_field),
                 tooltip=tooltip,
@@ -188,6 +189,7 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
             bars = base.mark_bar().encode(
                 y=y,
                 x=x,
+                x2=alt.value(lo),
                 color=alt.Color(
                     "mean_score:Q",
                     scale=alt.Scale(scheme="blues"),
@@ -197,7 +199,7 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
             )
             eb = base.mark_errorbar().encode(
                 y=y,
-                x=alt.X("lower:Q", scale=alt.Scale(domain=[lo, hi])),
+                x=alt.X("lower:Q", scale=alt.Scale(domain=[0, hi])),
                 x2="upper:Q",
                 tooltip=tooltip,
             )
@@ -205,6 +207,7 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
 
         chart = chart.properties(
             title="Scores par dimension (moyenne et intervalle de confiance)",
+            padding={"left": 120},
         )
 
         return chart.to_dict()

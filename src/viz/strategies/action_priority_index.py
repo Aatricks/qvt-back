@@ -164,8 +164,18 @@ class ActionPriorityIndexStrategy(IVisualizationStrategy):
             alt.Chart(out)
             .mark_bar()
             .encode(
-                y=alt.Y("dimension_label:N", sort="-x", title="Dimension QVT"),
-                x=alt.X("priority_index:Q", title="Indice de priorité (heuristique)"),
+                y=alt.Y(
+                    "dimension_label:N",
+                    sort="-x",
+                    title="Dimension QVT",
+                    axis=alt.Axis(labelLimit=260, labelPadding=8),
+                ),
+                x=alt.X(
+                    "priority_index:Q",
+                    title="Indice de priorité (heuristique)",
+                    scale=alt.Scale(zero=False),
+                ),
+                x2=alt.value(0),
                 color=alt.Color("segment:N", title=segment_field) if out["segment"].nunique() > 1 else alt.value("#2563EB"),
                 tooltip=[
                     alt.Tooltip("dimension_label:N", title="Dimension"),
@@ -178,7 +188,7 @@ class ActionPriorityIndexStrategy(IVisualizationStrategy):
                     alt.Tooltip("segment:N", title=segment_field),
                 ],
             )
-            .properties(title=title)
+            .properties(title=title, height={"step": 22}, padding={"left": 120})
         )
 
         return chart.to_dict()

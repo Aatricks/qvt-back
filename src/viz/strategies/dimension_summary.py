@@ -55,8 +55,17 @@ class PracticeDimensionSummaryStrategy(IVisualizationStrategy):
         )
 
         apply_theme()
-        x_encoding = alt.X("mean_score:Q", title="Score moyen (1-5)", scale=alt.Scale(domain=[1, 5]))
-        y_encoding = alt.Y("dimension_label:N", sort="-x", title="Dimension QVT")
+        x_encoding = alt.X(
+            "mean_score:Q",
+            title="Score moyen (1-5)",
+            scale=alt.Scale(domain=[0, 5]),
+        )
+        y_encoding = alt.Y(
+            "dimension_label:N",
+            sort="-x",
+            title="Dimension QVT",
+            axis=alt.Axis(labelLimit=260, labelPadding=8),
+        )
 
         if segment_field:
             chart = (
@@ -65,6 +74,7 @@ class PracticeDimensionSummaryStrategy(IVisualizationStrategy):
                 .encode(
                     y=y_encoding,
                     x=x_encoding,
+                    x2=alt.value(1),
                     color=alt.Color(f"{segment_field}:N", title=segment_field),
                     tooltip=[
                         "dimension_label",
@@ -73,7 +83,7 @@ class PracticeDimensionSummaryStrategy(IVisualizationStrategy):
                         "responses",
                     ],
                 )
-            )
+            ).properties(height={"step": 22}, padding={"left": 120})
         else:
             chart = (
                 alt.Chart(agg)
@@ -81,8 +91,9 @@ class PracticeDimensionSummaryStrategy(IVisualizationStrategy):
                 .encode(
                     y=y_encoding,
                     x=x_encoding,
+                    x2=alt.value(1),
                     color=alt.Color("mean_score:Q", scale=alt.Scale(scheme="blues"), legend=None),
                     tooltip=["dimension_label", alt.Tooltip("mean_score:Q", format=".2f"), "responses"],
                 )
-            )
+            ).properties(height={"step": 22}, padding={"left": 120})
         return chart.to_dict()

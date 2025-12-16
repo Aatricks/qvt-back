@@ -89,8 +89,14 @@ class ExampleNewChartStrategy(IVisualizationStrategy):
             alt.Chart(agg)
             .mark_bar()
             .encode(
-                y=alt.Y("dimension_label:N", sort=None, title="Dimension QVT"),
-                x=alt.X("mean_score:Q", title="Score moyen (1-5)", scale=alt.Scale(domain=[1, 5])),
+                y=alt.Y(
+                    "dimension_label:N",
+                    sort=None,
+                    title="Dimension QVT",
+                    axis=alt.Axis(labelLimit=260, labelPadding=8),
+                ),
+                x=alt.X("mean_score:Q", title="Score moyen (1-5)", scale=alt.Scale(domain=[0, 5])),
+                x2=alt.value(1),
                 color=alt.Color(
                     "status:N",
                     title="Statut",
@@ -116,4 +122,4 @@ class ExampleNewChartStrategy(IVisualizationStrategy):
             .encode(x="x:Q"),
         ]
 
-        return alt.layer(chart, *rules).to_dict()
+        return alt.layer(chart, *rules).properties(height={"step": 22}, padding={"left": 120}).to_dict()

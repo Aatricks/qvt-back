@@ -13,26 +13,31 @@ from src.viz.theme import apply_theme
 class LikertDistributionStrategy(IVisualizationStrategy):
     """Diverging stacked bar distribution of Likert responses.
 
-        Supports survey data provided either as:
-            - wide format (one row per respondent + Likert item columns like PGC2, EPUI1, ...), or
-            - long format with columns: question_label, response_value.
+    Supports survey data provided either as:
+        - wide format (one row per respondent + Likert item columns like PGC2, EPUI1, ...), or
+        - long format with columns: question_label, response_value.
 
-        Config:
-            - top_n (int): limit number of questions shown (default 25)
-            - focus ("lowest"|"highest"): which questions to keep by net agreement (default "lowest")
-            - sort ("net_agreement"|"mean"): ordering metric within the kept set (default "net_agreement")
-            - segment_field (str, optional): include segment in aggregation and expose an interactive dropdown
-            - interactive_dimension (bool): dropdown filter on dimension prefix (default True)
+    Config:
+        - top_n (int): limit number of questions shown (default 25)
+        - focus ("lowest"|"highest"): which questions to keep by net agreement (default "lowest")
+        - sort ("net_agreement"|"mean"): ordering metric within the kept set (default "net_agreement")
+        - segment_field (str, optional): include segment in aggregation and expose an interactive dropdown
+        - interactive_dimension (bool): dropdown filter on dimension prefix (default True)
 
-        Filters:
-            - applied as equality on available columns.
+    Filters:
+        - applied as equality on available columns.
 
-        Notes:
-            - Neutral (3) is split half-left / half-right so the bar is centered.
+    Notes:
+                    - Uses Vega-Lite `stack='center'` so the neutral category (3) naturally sits centered
+                        (single segment), with 1–2 on the left and 4–5 on the right.
     """
 
     def generate(
-        self, data: Dict[str, pd.DataFrame], config: Dict[str, Any], filters: Dict[str, Any], settings: Any
+        self,
+        data: Dict[str, pd.DataFrame],
+        config: Dict[str, Any],
+        filters: Dict[str, Any],
+        settings: Any,
     ) -> Dict[str, Any]:
         survey_df = data.get("survey")
         if survey_df is None:
@@ -63,12 +68,16 @@ class LikertDistributionStrategy(IVisualizationStrategy):
         if "question_label" not in df.columns or "response_value" not in df.columns:
             if not likert_cols:
                 raise ValueError("No Likert columns detected for distribution")
-            df = to_likert_long(df, likert_cols, extra_id_vars=[segment_field] if segment_field else None)
+            df = to_likert_long(
+                df, likert_cols, extra_id_vars=[segment_field] if segment_field else None
+            )
         else:
             # Long format may not contain dimension_prefix.
             if "dimension_prefix" not in df.columns:
                 df = df.copy()
-                df["dimension_prefix"] = df["question_label"].astype(str).str.extract(r"^([A-Za-z]+)")[0]
+                df["dimension_prefix"] = (
+                    df["question_label"].astype(str).str.extract(r"^([A-Za-z]+)")[0]
+                )
 
         apply_theme()
 
@@ -93,16 +102,13 @@ class LikertDistributionStrategy(IVisualizationStrategy):
         counts["share"] = counts["count"] / counts["total"].where(counts["total"] != 0, 1)
 
         # Compute net agreement and mean score.
-        wide = (
-            counts.pivot_table(
-                index=group_cols,
-                columns="response_value",
-                values="count",
-                aggfunc="sum",
-                fill_value=0,
-            )
-            .reset_index()
-        )
+        wide = counts.pivot_table(
+            index=group_cols,
+            columns="response_value",
+            values="count",
+            aggfunc="sum",
+            fill_value=0,
+        ).reset_index()
         for k in [1, 2, 3, 4, 5]:
             if k not in wide.columns:
                 wide[k] = 0
@@ -112,10 +118,14 @@ class LikertDistributionStrategy(IVisualizationStrategy):
         wide["mean"] = (wide[1] * 1 + wide[2] * 2 + wide[3] * 3 + wide[4] * 4 + wide[5] * 5) / denom
         wide["net_agreement"] = ((wide[4] + wide[5]) - (wide[1] + wide[2])) / denom
 
-        counts = counts.merge(wide[group_cols + ["mean", "net_agreement"]], on=group_cols, how="left")
+        counts = counts.merge(
+            wide[group_cols + ["mean", "net_agreement"]], on=group_cols, how="left"
+        )
 
         # Keep top-N questions by net agreement (decision-aid: surface weakest/strongest first).
-        metric_series = counts.drop_duplicates(subset=group_cols)[group_cols + ["net_agreement"]].copy()
+        metric_series = counts.drop_duplicates(subset=group_cols)[
+            group_cols + ["net_agreement"]
+        ].copy()
         if focus == "lowest":
             metric_series = metric_series.sort_values("net_agreement", ascending=True)
         else:
@@ -134,25 +144,10 @@ class LikertDistributionStrategy(IVisualizationStrategy):
         dim_map = df[["question_label", "dimension_prefix"]].drop_duplicates()
         counts = counts.merge(dim_map, on="question_label", how="left")
 
-        # --- Build diverging bars ---
+        # --- Standard 100% Stacked Bar ---
+        # No negative shares, standard normalization.
         plot_df = counts.copy()
-        plot_df["share_signed"] = plot_df["share"]
-        plot_df.loc[plot_df["response_value"] < 3, "share_signed"] = -plot_df.loc[
-            plot_df["response_value"] < 3, "share"
-        ]
-        # Split neutral half-left / half-right
-        is_neutral = plot_df["response_value"] == 3
-        plot_df.loc[is_neutral, "share_signed"] = plot_df.loc[is_neutral, "share"] / 2.0
-        neutral_left = plot_df[is_neutral].copy()
-        neutral_left["share_signed"] = -neutral_left["share_signed"]
-        plot_df = pd.concat([plot_df[~is_neutral], plot_df[is_neutral], neutral_left], ignore_index=True)
-
-        plot_df["share_plot"] = plot_df["share_signed"].abs()
-        plot_df["count_plot"] = plot_df["count"].astype(float)
-        plot_df.loc[plot_df["response_value"] == 3, "count_plot"] = plot_df.loc[
-            plot_df["response_value"] == 3, "count_plot"
-        ] / 2.0
-
+        
         # Ordering: by chosen metric within the kept set
         plot_df["sort_value"] = plot_df[sort_metric]
 
@@ -191,21 +186,23 @@ class LikertDistributionStrategy(IVisualizationStrategy):
             range=["#B91C1C", "#FCA5A5", "#D1D5DB", "#93C5FD", "#1D4ED8"],
         )
 
-        bars = (
+        chart = (
             base.mark_bar()
             .encode(
                 y=alt.Y(
                     "question_label:N",
-                    sort=alt.SortField("sort_value", order="ascending" if focus == "lowest" else "descending"),
+                    sort=alt.SortField(
+                        "sort_value", order="ascending" if focus == "lowest" else "descending"
+                    ),
                     title="Question",
+                    axis=alt.Axis(labelLimit=260, labelPadding=8),
                 ),
                 x=alt.X(
-                    "share_signed:Q",
-                    stack="zero",
+                    "share:Q",
+                    stack="normalize",
                     axis=alt.Axis(
-                        title="Part des réponses (désaccord ↔ accord)",
+                        title="Répartition des réponses",
                         format="%",
-                        labelExpr="replace(datum.label, '-', '')",
                     ),
                 ),
                 color=alt.Color(
@@ -219,15 +216,13 @@ class LikertDistributionStrategy(IVisualizationStrategy):
                     alt.Tooltip("question_label:N", title="Question"),
                     alt.Tooltip("dimension_prefix:N", title="Dimension"),
                     alt.Tooltip("response_value:O", title="Réponse"),
-                    alt.Tooltip("count_plot:Q", title="N (segment)", format=".0f"),
-                    alt.Tooltip("share_plot:Q", title="Part", format=".1%"),
+                    alt.Tooltip("count:Q", title="N (segment)", format=".0f"),
+                    alt.Tooltip("share:Q", title="Part", format=".1%"),
                     alt.Tooltip("mean:Q", title="Moyenne", format=".2f"),
                     alt.Tooltip("net_agreement:Q", title="Net agreement", format=".1%"),
                 ],
             )
-            .properties(title="Distribution des réponses (Likert)")
+            .properties(title="Distribution des réponses (Likert)", padding={"left": 120})
         )
 
-        zero = alt.Chart(pd.DataFrame({"x": [0]})).mark_rule(color="#111827").encode(x="x:Q")
-
-        return alt.layer(bars, zero).to_dict()
+        return chart.to_dict()

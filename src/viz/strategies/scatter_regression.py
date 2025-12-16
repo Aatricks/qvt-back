@@ -100,7 +100,11 @@ class ScatterRegressionStrategy(IVisualizationStrategy):
         layers = [base]
 
         if bool(config.get("regression", True)):
-            method = config.get("method", "linear")
+            raw_method = config.get("method", "linear")
+            valid_methods = {"linear", "log", "exp", "pow", "quad", "poly"}
+            # Fallback to linear if method is unknown (e.g. "spearman") or not supported
+            method = raw_method if raw_method in valid_methods else "linear"
+            
             order = config.get("order")
             ci = bool(config.get("ci", False))
 
