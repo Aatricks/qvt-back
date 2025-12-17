@@ -222,7 +222,7 @@ class LikertDistributionStrategy(IVisualizationStrategy):
                     alt.Tooltip("net_agreement:Q", title="Net agreement", format=".1%"),
                 ],
             )
-            .properties(title="Distribution des réponses (Likert)", padding={"left": 120})
+            .properties(title="Distribution des réponses (Likert)", padding={"left": 120}, width="container")
         )
 
         return chart.to_dict()

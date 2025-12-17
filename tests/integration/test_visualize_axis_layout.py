@@ -49,7 +49,6 @@ def _has_height_step(spec: dict, step: int = 22) -> bool:
     [
         "dimension_summary",
         "dimension_ci_bars",
-        "example_new_chart",
     ],
 )
 def test_visualize_axis_layout(client, chart_key):

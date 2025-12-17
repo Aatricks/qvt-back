@@ -54,8 +54,8 @@ class DistributionAnomaliesStrategy(IVisualizationStrategy):
             alt.Chart(chart_df)
             .mark_bar()
             .encode(
-                x=alt.X("question_label:N", sort="-y", title="Question"),
-                y=alt.Y("skewness:Q", title="Asymétrie (skew)"),
+                y=alt.Y("question_label:N", sort="-x", title="Question"),
+                x=alt.X("skewness:Q", title="Asymétrie (skew)"),
                 color=alt.Color("classification:N", title="Profil"),
                 tooltip=[
                     "question_label",
@@ -65,5 +65,6 @@ class DistributionAnomaliesStrategy(IVisualizationStrategy):
                     "classification",
                 ],
             )
+            .properties(width="container")
         )
         return chart.to_dict()

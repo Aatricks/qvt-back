@@ -3,7 +3,6 @@
 from pathlib import Path
 import pandas as pd
 
-from src.viz.strategies.example_new_chart import ExampleNewChartStrategy
 from src.viz.strategies.dimension_ci_bars import DimensionCIBarsStrategy
 from src.viz.strategies.dimension_summary import PracticeDimensionSummaryStrategy
 
@@ -71,23 +70,6 @@ def _find_left_padding(spec: dict) -> float | None:
     return None
 
 
-def test_example_new_chart_axis_and_height():
-    df = _load_pov()
-    strat = ExampleNewChartStrategy()
-    spec = strat.generate({"survey": df}, {}, {}, {})
-    enc = _find_encoding_with_y(spec)
-
-    axis = enc["y"].get("axis") if isinstance(enc.get("y"), dict) else None
-    assert axis is not None, "example_new_chart: 'y' encoding must contain an 'axis' object"
-    assert axis.get("labelLimit") == 260, "example_new_chart: expected y axis labelLimit == 260"
-    assert axis.get("labelPadding") == 8, "example_new_chart: expected y axis labelPadding == 8"
-    # Bars should be anchored to the left domain bound via x2=1
-    x2 = enc.get("x2")
-    assert x2 is not None, "example_new_chart: expected 'x2' anchor to be present"
-    assert x2.get("value") in (1, 1.0), "example_new_chart: expected 'x2' anchor value to be 1"
-    left_pad = _find_left_padding(spec)
-    assert left_pad is not None and float(left_pad) >= 120, "example_new_chart: expected left padding >= 120"
-    assert _has_height_step(spec, step=22), "example_new_chart: expected chart height to include {'step': 22}"
 
 
 def test_dimension_ci_bars_axis_and_height():

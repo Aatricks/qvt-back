@@ -21,19 +21,17 @@ import src.viz  # noqa: F401 ensures default strategies registered
 #  - long format (question_label + response_value).
 SURVEY_CHART_KEYS = {
     "likert_distribution",
-    "likert_item_heatmap",
     "distribution_anomalies",
     "anova_significance",
     "dimension_summary",
-    "dimension_heatmap",
-    "dimension_boxplot",
     "dimension_mean_std_scatter",
     "dimension_ci_bars",
-    "scatter_regression",
     "eng_epui_quadrants",
     "importance_performance_matrix",
-    # extension point
-    "example_new_chart",
+    "action_priority_index",
+    "leverage_scatter",
+    "predictive_simulation",
+    "clustering_profile",
 }
 
 

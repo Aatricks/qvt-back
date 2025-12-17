@@ -15,7 +15,6 @@ FIXTURES = Path(__file__).parent.parent / "fixtures"
         "anova_significance",
         "dimension_summary",
         "importance_performance_matrix",
-        "scatter_regression",
     ],
 )
 def test_visualize_success(client, chart_key):

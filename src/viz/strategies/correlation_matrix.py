@@ -53,5 +53,6 @@ class CorrelationMatrixStrategy(IVisualizationStrategy):
                 color=alt.Color("correlation:Q", scale=alt.Scale(scheme="blueorange")),
                 tooltip=["metric_x", "metric_y", alt.Tooltip("correlation:Q", format=".2f")],
             )
+            .properties(width="container")
         )
         return chart.to_dict()

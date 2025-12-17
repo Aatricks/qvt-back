@@ -62,7 +62,7 @@ class AnovaSignificanceStrategy(IVisualizationStrategy):
             raise ValueError("No significant differences detected")
 
         top_n = int(config.get("top_n", 5))
-        columns = int(config.get("columns", 2))
+        columns = int(config.get("columns", 3))
         top = sorted(significant_combos, key=lambda r: r["p_value"])[:top_n]
         plot_rows: List[Dict[str, Any]] = []
         for combo in top:
@@ -111,7 +111,7 @@ class AnovaSignificanceStrategy(IVisualizationStrategy):
                         alt.Tooltip("f_stat:Q", title="F", format=".2f"),
                     ],
                 )
-                .properties(width=220, height=160)
+                .properties(width=180, height=140)
             )
             charts.append(c)
 

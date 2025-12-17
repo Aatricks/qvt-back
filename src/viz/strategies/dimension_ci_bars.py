@@ -208,6 +208,7 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
         chart = chart.properties(
             title="Scores par dimension (moyenne et intervalle de confiance)",
             padding={"left": 120},
+            width="container",
         )
 
         return chart.to_dict()
