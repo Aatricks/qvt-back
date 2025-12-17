@@ -130,4 +130,4 @@ class DimensionMeanStdScatterStrategy(IVisualizationStrategy):
 
         chart = alt.layer(*layers)
 
-        return chart.to_dict()
+        return chart.interactive().to_dict()

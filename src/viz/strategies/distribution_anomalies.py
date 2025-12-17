@@ -38,7 +38,7 @@ class DistributionAnomaliesStrategy(IVisualizationStrategy):
             records.append(
                 {
                     "question_label": question,
-                    "skewness": group["response_value"].skew(),
+                    "skewness": -1 * group["response_value"].skew(),
                     "mean": group["response_value"].mean(),
                     "std": group["response_value"].std(),
                     "classification": classification,
@@ -66,5 +66,6 @@ class DistributionAnomaliesStrategy(IVisualizationStrategy):
                 ],
             )
             .properties(width="container")
+            .interactive()
         )
         return chart.to_dict()

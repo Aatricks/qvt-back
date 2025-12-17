@@ -149,4 +149,4 @@ class DemographicDistributionStrategy(IVisualizationStrategy):
                     x=alt.X("pct:Q", title="Pourcentage", axis=alt.Axis(format="%"))
                 )
 
-        return chart.to_dict()
+        return chart.interactive().to_dict()

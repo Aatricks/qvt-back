@@ -124,4 +124,4 @@ class ClusteringProfileStrategy(IVisualizationStrategy):
 
         return (heatmap + text).properties(
             title="Profils Types (Clustering)"
-        ).to_dict()
+        ).interactive().to_dict()

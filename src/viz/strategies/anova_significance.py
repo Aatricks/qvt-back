@@ -111,11 +111,12 @@ class AnovaSignificanceStrategy(IVisualizationStrategy):
                         alt.Tooltip("f_stat:Q", title="F", format=".2f"),
                     ],
                 )
-                .properties(width=180, height=140)
+                .properties(width=200, height=150) # Set explicit width/height
             )
             charts.append(c)
 
         if not charts:
             raise ValueError("No significant differences detected")
 
-        return alt.concat(*charts, columns=columns).to_dict()
+        # Interactive concatenation
+        return alt.concat(*charts, columns=columns).resolve_scale(color='independent').to_dict()

@@ -189,6 +189,7 @@ class ActionPriorityIndexStrategy(IVisualizationStrategy):
                 ],
             )
             .properties(title=title, height={"step": 22}, padding={"left": 120})
+            .interactive()
         )
 
         return chart.to_dict()

@@ -44,15 +44,27 @@ class CorrelationMatrixStrategy(IVisualizationStrategy):
         corr_reset.columns = ["metric_x", "metric_y", "correlation"]
 
         apply_theme()
-        chart = (
-            alt.Chart(corr_reset)
-            .mark_rect()
-            .encode(
-                x="metric_x:N",
-                y="metric_y:N",
-                color=alt.Color("correlation:Q", scale=alt.Scale(scheme="blueorange")),
-                tooltip=["metric_x", "metric_y", alt.Tooltip("correlation:Q", format=".2f")],
-            )
-            .properties(width="container")
+        
+        base = alt.Chart(corr_reset).encode(
+            x="metric_x:N",
+            y="metric_y:N"
         )
-        return chart.to_dict()
+        
+        heatmap = base.mark_rect().encode(
+            color=alt.Color("correlation:Q", scale=alt.Scale(scheme="blueorange")),
+            tooltip=["metric_x", "metric_y", alt.Tooltip("correlation:Q", format=".2f")]
+        )
+        
+        text = base.mark_text().encode(
+            text=alt.Text("correlation:Q", format=".2f"),
+            color=alt.condition(
+                alt.datum.correlation > 0.5,
+                alt.value("white"),
+                alt.value("black")
+            )
+        )
+        
+        return (heatmap + text).properties(
+            width=alt.Step(40),
+            height=alt.Step(40)
+        ).interactive().to_dict()

@@ -211,4 +211,4 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
             width="container",
         )
 
-        return chart.to_dict()
+        return chart.interactive().to_dict()

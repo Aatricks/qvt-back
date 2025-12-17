@@ -135,6 +135,6 @@ class PredictiveSimulationStrategy(IVisualizationStrategy):
             ]
         ).properties(
             title=f"Drivers de : {target_label}"
-        )
+        ).interactive()
 
         return chart.to_dict()

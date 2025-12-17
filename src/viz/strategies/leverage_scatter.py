@@ -151,4 +151,4 @@ class LeverageScatterStrategy(IVisualizationStrategy):
             )
         )
 
-        return alt.layer(points, labels).to_dict()
+        return alt.layer(points, labels).interactive().to_dict()

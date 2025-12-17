@@ -249,4 +249,4 @@ class ImportancePerformanceMatrixStrategy(IVisualizationStrategy):
             text="label:N",
         )
 
-        return alt.layer(points, dim_labels, v_rule, h_rule, q_text).to_dict()
+        return alt.layer(points, dim_labels, v_rule, h_rule, q_text).interactive().to_dict()

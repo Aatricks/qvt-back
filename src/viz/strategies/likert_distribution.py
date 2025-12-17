@@ -223,6 +223,7 @@ class LikertDistributionStrategy(IVisualizationStrategy):
                 ],
             )
             .properties(title="Distribution des réponses (Likert)", padding={"left": 120}, width="container")
+            .interactive()
         )
 
         return chart.to_dict()

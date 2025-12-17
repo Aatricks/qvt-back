@@ -83,7 +83,7 @@ class PracticeDimensionSummaryStrategy(IVisualizationStrategy):
                         "responses",
                     ],
                 )
-            ).properties(height={"step": 22}, padding={"left": 120})
+            ).properties(height={"step": 22}, padding={"left": 120}).interactive()
         else:
             chart = (
                 alt.Chart(agg)
@@ -95,5 +95,5 @@ class PracticeDimensionSummaryStrategy(IVisualizationStrategy):
                     color=alt.Color("mean_score:Q", scale=alt.Scale(scheme="blues"), legend=None),
                     tooltip=["dimension_label", alt.Tooltip("mean_score:Q", format=".2f"), "responses"],
                 )
-            ).properties(height={"step": 22}, padding={"left": 120})
+            ).properties(height={"step": 22}, padding={"left": 120}).interactive()
         return chart.to_dict()
