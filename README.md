@@ -1,36 +1,55 @@
-# qvt-back
+# QVT-Back
 
-FastAPI backend that generates Vega-Lite JSON specs (Altair) from uploaded QVCT/QVT survey files.
+Backend de visualisation QVCTi. Une API sans état construite avec FastAPI et Altair pour générer des spécifications de visualisation Vega-Lite.
 
-## Run the API (dev)
+## Fonctionnalités
 
-- Health check: `GET /health`
-- Supported chart keys: `GET /api/visualize/supported-keys`
-- Generate a chart: `POST /api/visualize/{chart_key}` (multipart form with `hr_file` and optional `filters`/`config` JSON strings)
+- API sans état (pas de stockage de données) conçue pour générer des spécifications de visualisation à la demande.
+- Construction programmatique de spécifications JSON Vega-Lite utilisant Altair.
+- Traitement efficace des données avec Pandas et NumPy.
 
-Typical dev command:
+## Prérequis
 
-- `uvicorn src.api.app:app --reload --port 8000`
+- Python 3.10 ou supérieur
 
-### CORS
+## Installation
 
-If you serve the frontend from a different origin (instead of using the Vite dev proxy), you can set:
+1. Créer et activer un environnement virtuel :
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate  # Sous Windows : .venv\Scripts\activate
+   ```
 
-- `QVCTI_CORS_ALLOW_ORIGINS=*` (default) or a comma-separated list.
+2. Installer les dépendances :
+   ```bash
+   # Installer les dépendances principales
+   pip install -e .
 
-## Run the React site
+   # Installer les dépendances de développement (tests, linting)
+   pip install -e ".[dev]"
+   
+   # Si vous utilisez uv: 
+   # uv sync
+   ```
 
-The React/Vite app lives in `site/` and can load the bundled sample CSV:
+## Utilisation
 
-- `site/public/PROJET_POV-ML_-_Fichier_de_données_brutes.csv`
+### Lancer le serveur API
 
-Dev workflow:
+Démarrer le serveur de développement avec rechargement automatique (hot-reload) :
 
-- in `site/`: `npm install`
-- in `site/`: `npm run dev`
+```bash
+uvicorn src.api.app:app --reload
+```
 
-The site provides 3 role-based pages:
+L'API sera disponible à l'adresse `http://127.0.0.1:8000`.
+- Vérification de l'état (Health Check) : `GET /health`
+- Documentation : `http://127.0.0.1:8000/docs`
 
-- Employé: basic state + suggested actions
-- Manager: curated insights + recommended actions
-- RH: full chart explorer with filters/config
+### Lancer les tests
+
+Exécuter la suite de tests avec `pytest` :
+
+```bash
+pytest
+```
