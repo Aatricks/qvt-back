@@ -136,11 +136,10 @@ class AnovaSignificanceStrategy(IVisualizationStrategy):
         apply_theme()
 
         charts: List[alt.Chart] = []
-        for d_label in chart_df["dimension_label"].unique():
-            sub = chart_df[chart_df["dimension_label"] == d_label]
-            gv = sub["group_variable"].iloc[0]
+        # Group by both dimension AND the demographic variable to prevent mixing categories
+        for (d_label, g_var), sub in chart_df.groupby(["dimension_label", "group_variable"], sort=False):
             pv = sub["p_value"].iloc[0]
-            title = f"{d_label} (split: {gv}, p={pv:.3g})"
+            title = f"{d_label} (selon {g_var}, p={pv:.3g})"
 
             base = alt.Chart(sub, title=title).encode(
                 x=alt.X("group_value:N", title=None, axis=alt.Axis(labelAngle=-45, labelLimit=100))
