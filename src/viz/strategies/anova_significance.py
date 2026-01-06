@@ -140,7 +140,7 @@ class AnovaSignificanceStrategy(IVisualizationStrategy):
 
             bars = base.mark_bar(opacity=0.7).encode(
                 y=alt.Y("mean:Q", title="Moyenne (1-5)", scale=alt.Scale(domain=[1, 5])),
-                y2=alt.value(0), # Anchor bars to the bottom of the chart area (value 1 in the domain)
+                y2=alt.datum(1), # Anchor bars to the Likert scale minimum (1)
                 color=alt.Color("group_value:N", legend=None),
                 tooltip=[
                     alt.Tooltip("group_value:N", title="Groupe"),

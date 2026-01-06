@@ -164,7 +164,7 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
             bars = base.mark_bar().encode(
                 y=y,
                 x=x,
-                x2=alt.value(lo),
+                x2=alt.datum(lo),
                 color=alt.Color(
                     "mean_score:Q",
                     scale=alt.Scale(scheme="blues"),
