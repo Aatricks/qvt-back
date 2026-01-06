@@ -17,7 +17,7 @@ from src.services.survey_utils import (
 from src.viz.base import IVisualizationStrategy
 from src.viz.theme import apply_theme
 
-
+# TODO: improve UI/UX 
 class ClusteringProfileStrategy(IVisualizationStrategy):
     """
     Segments respondents into clusters based on their QVT profile (Dimension scores).
@@ -127,7 +127,7 @@ class ClusteringProfileStrategy(IVisualizationStrategy):
         for field in demo_fields:
             if field not in full_df.columns:
                 continue
-                
+
             # Compute distribution for this field per cluster
             counts = full_df.groupby(["label_with_n", field]).size().reset_index(name="sub_count")
             totals = full_df.groupby("label_with_n").size().reset_index(name="cluster_total")
@@ -144,17 +144,17 @@ class ClusteringProfileStrategy(IVisualizationStrategy):
                 .encode(
                     y=alt.Y("label_with_n:N", title=None, axis=alt.Axis(labels=False, ticks=False)),
                     x=alt.X(
-                        "percentage:Q", 
-                        title=field, 
+                        "percentage:Q",
+                        title=field,
                         axis=alt.Axis(format="%", ticks=False, labels=False, grid=False)
                     ),
                     color=alt.Color(
-                        f"{field}:N", 
-                        title=field, 
+                        f"{field}:N",
+                        title=field,
                         legend=alt.Legend(
-                            orient="bottom", 
-                            columns=2, 
-                            titleFontSize=10, 
+                            orient="bottom",
+                            columns=2,
+                            titleFontSize=10,
                             labelFontSize=9,
                             symbolSize=40
                         )
@@ -203,17 +203,17 @@ class ClusteringProfileStrategy(IVisualizationStrategy):
         )
 
         profile_chart = (heatmap + text).properties(
-            width=300, 
+            width=300,
             height=alt.Step(40),
             title="Scores moyens par dimension"
         )
 
         if demo_charts:
-            # Combine heatmap with all demographic bars. 
+            # Combine heatmap with all demographic bars.
             # hconcat ensures they share the Y axis (Profils) visually.
             final_chart = alt.hconcat(
-                profile_chart, 
-                *demo_charts, 
+                profile_chart,
+                *demo_charts,
                 spacing=5
             ).resolve_scale(y="shared")
         else:

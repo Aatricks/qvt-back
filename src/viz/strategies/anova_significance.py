@@ -13,7 +13,7 @@ from src.services.survey_utils import (
 from src.viz.base import IVisualizationStrategy
 from src.viz.theme import apply_theme
 
-
+# TODO: investigate how this can be improved
 class AnovaSignificanceStrategy(IVisualizationStrategy):
     """Finds socio-demographic splits with significant mean differences (ANOVA)."""
 

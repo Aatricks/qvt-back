@@ -7,7 +7,7 @@ from src.services.survey_utils import add_age_band, available_demographics
 from src.viz.base import IVisualizationStrategy
 from src.viz.theme import apply_theme
 
-
+# TODO: if no field is specified, do a variety of distributions for key demographics (Age, Sexe, Contrat, Secteur, etc.)
 class DemographicDistributionStrategy(IVisualizationStrategy):
     """
     Univariate distribution d'une variable sociodémographique (histogramme pour numérique, barres pour catégoriel).
