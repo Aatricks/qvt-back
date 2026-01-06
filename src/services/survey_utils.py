@@ -23,22 +23,44 @@ LIKERT_PREFIX_LABELS: Dict[str, str] = {
     "POV": "Pratiques organisationnelles vertueuses",
     "PGC": "Pratiques de gestion de carrière",
     "CSA": "Pratiques de santé et de sécurité",
-    "EVPVP": "Pratiques de conciliation vie privée / personnelle",
+    "EVPVP": "Pratiques de conciliation entre la vie privée et la vie personnelle",
     "RECO": "Pratiques de reconnaissance",
     "COM": "Pratiques de communication",
     "DL": "Pratiques de dialogue social",
-    "PPD": "Participation à la prise de décision",
+    "PPD": "Pratiques de participation à la prise de décision",
     "JUST": "Pratiques de justice organisationnelle",
     "PI": "Pratiques d'inclusion",
     "PD": "Pratiques de développement durable",
     "ENG": "Engagement au travail",
-    "EPUI": "Épuisement émotionnel",
-    "CSE": "Conditions de santé et sécurité",
+    "EPUI": "Epuisement émotionnel",
+}
+
+# Mapping for numeric socio-demographic codes to human-readable labels
+DEMO_VALUE_MAPPING: Dict[str, Dict[int, str]] = {
+    "Sexe": {1: "Homme", 2: "Femme", 3: "Autre"},
+    "Encadre": {
+        1: "Non",
+        2: "Oui, en tant que cadre opérationnel",
+        3: "Oui, en tant que cadre dirigeant",
+    },
+    "Temps": {1: "Temps plein", 2: "Temps partiel"},
+    "Contrat": {1: "CDI", 2: "CDD", 3: "Intérim"},
+    "Secteur": {1: "Privé", 2: "Public", 3: "Associatif"},
+    "TailleOr": {
+        1: "Moins de 10",
+        2: "De 11 à 49",
+        3: "De 50 à 249",
+        4: "De 250 à 499",
+        5: "500 et plus",
+    },
 }
 
 
 def _normalize_column_name(col: str) -> str:
-    return str(col).strip()
+    name = str(col).strip()
+    if name.upper() == "ANCIENNE":
+        return "Ancienneté"
+    return name
 
 
 def _extract_prefix(column: str) -> str:
@@ -51,7 +73,13 @@ def _extract_prefix(column: str) -> str:
 
 def available_demographics(df: pd.DataFrame) -> List[str]:
     normalized = {_normalize_column_name(col).upper(): col for col in df.columns}
-    return [normalized[name.upper()] for name in SOCIO_COLUMNS if name.upper() in normalized]
+    # Include both raw and banded columns if they exist
+    base = [normalized[name.upper()] for name in SOCIO_COLUMNS if name.upper() in normalized]
+    if "AgeClasse" in df.columns and "AgeClasse" not in base:
+        base.append("AgeClasse")
+    if "AnciennetéClasse" in df.columns and "AnciennetéClasse" not in base:
+        base.append("AnciennetéClasse")
+    return base
 
 
 def detect_likert_columns(df: pd.DataFrame) -> List[str]:
@@ -83,8 +111,7 @@ def to_likert_long(
         for col in extra_id_vars:
             if col in df.columns and col not in id_vars:
                 id_vars.append(col)
-    if "AgeClasse" in df.columns and "AgeClasse" not in id_vars:
-        id_vars = [*id_vars, "AgeClasse"]
+    
     melted = df.melt(
         id_vars=id_vars,
         value_vars=likert_cols,
@@ -104,7 +131,23 @@ def add_age_band(df: pd.DataFrame) -> pd.DataFrame:
     result["AgeClasse"] = pd.cut(
         result["Age"],
         bins=[0, 29, 39, 49, 59, np.inf],
-        labels=["<30", "30-39", "40-49", "50-59", "60+"],
+        labels=["Moins de 30 ans", "30-39 ans", "40-49 ans", "50-59 ans", "60 ans et plus"],
+    )
+    return result
+
+
+def add_seniority_band(df: pd.DataFrame) -> pd.DataFrame:
+    # "Ancienneté" might have been renamed from "Ancienne" already
+    target = "Ancienneté" if "Ancienneté" in df.columns else "Ancienne"
+    if target not in df.columns:
+        return df
+    
+    result = df.copy()
+    result[target] = pd.to_numeric(result[target], errors="coerce")
+    result["AnciennetéClasse"] = pd.cut(
+        result[target],
+        bins=[0, 1, 5, 10, 20, np.inf],
+        labels=["Moins d'un an", "1-5 ans", "6-10 ans", "11-20 ans", "Plus de 20 ans"],
     )
     return result
 

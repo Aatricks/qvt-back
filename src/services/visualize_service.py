@@ -10,7 +10,11 @@ from src.config.settings import settings
 from src.schemas.datasets import HR_REQUIRED_COLUMNS, SURVEY_REQUIRED_COLUMNS
 from src.schemas.visualize import ChartRequest
 from src.services import data_loader
-from src.services.survey_utils import detect_likert_columns
+from src.services.survey_utils import (
+    add_age_band,
+    add_seniority_band,
+    detect_likert_columns,
+)
 from src.services.validators import check_likert_range, missing_columns
 from src.viz.registry import factory
 
@@ -78,6 +82,9 @@ async def generate_chart(
         hr_bytes = await _read_upload(hr_file)
         try:
             hr_df = data_loader.read_bytes_to_df(hr_bytes, hr_file.filename)
+            # Standardize age/seniority grouping early
+            hr_df = add_age_band(hr_df)
+            hr_df = add_seniority_band(hr_df)
         except ValueError as exc:
             raise ValidationFailure(
                 code="dataset_too_large", message="Dataset too large", details=[str(exc)]
@@ -97,6 +104,9 @@ async def generate_chart(
             survey_bytes = await _read_upload(survey_file)
             try:
                 survey_df = data_loader.read_bytes_to_df(survey_bytes, survey_file.filename)
+                # Standardize age/seniority grouping early
+                survey_df = add_age_band(survey_df)
+                survey_df = add_seniority_band(survey_df)
             except ValueError as exc:
                 raise ValidationFailure(
                     code="dataset_too_large", message="Dataset too large", details=[str(exc)]
