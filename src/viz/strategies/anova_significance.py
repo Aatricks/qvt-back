@@ -6,20 +6,20 @@ import pandas as pd
 from scipy import stats
 from scipy.stats import f_oneway
 
+from src.services.qvt_metrics import compute_prefix_scores, prefix_label
 from src.services.survey_utils import (
     DEMO_VALUE_MAPPING,
     add_age_band,
     add_seniority_band,
     available_demographics,
     detect_likert_columns,
-    to_likert_long,
 )
 from src.viz.base import IVisualizationStrategy
 from src.viz.theme import apply_theme
 
 
 class AnovaSignificanceStrategy(IVisualizationStrategy):
-    """Finds socio-demographic splits with significant mean differences (ANOVA)."""
+    """Finds socio-demographic splits with significant mean differences (ANOVA) on dimensions."""
 
     def generate(
         self, data: Dict[str, pd.DataFrame], config: Dict[str, Any], filters: Dict[str, Any], settings: Any
@@ -41,25 +41,32 @@ class AnovaSignificanceStrategy(IVisualizationStrategy):
             if key in df.columns:
                 df = df[df[key] == value]
 
-        likert_cols = detect_likert_columns(df)
-        if not likert_cols:
-            raise ValueError("No Likert columns detected")
+        # 1. Compute dimension scores (DIM_PGC, DIM_EPUI, etc.)
+        scores_df = compute_prefix_scores(df)
+        if scores_df.empty:
+            raise ValueError("No Likert dimensions available for ANOVA")
+
+        # Combine with demographics for analysis
+        combined = pd.concat([df, scores_df], axis=1)
 
         # Exclude raw numeric fields, focus on categories/bands
         exclude = {"ID", "Age", "Ancienne", "Ancienneté"}
         demographics = [d for d in available_demographics(df) if d not in exclude]
 
-        long_df = to_likert_long(df, likert_cols)
-        long_df["response_value"] = pd.to_numeric(long_df["response_value"], errors="coerce")
-        long_df = long_df.dropna(subset=["response_value"])
-
         significant_combos: List[Dict[str, Any]] = []
-        for question, q_df in long_df.groupby("question_label"):
+        dim_cols = scores_df.columns.tolist()
+
+        for dim_col in dim_cols:
             for demo in demographics:
-                if demo not in q_df.columns:
+                if demo not in combined.columns:
                     continue
-                split = q_df.dropna(subset=[demo])
-                groups = [group["response_value"].values for _, group in split.groupby(demo, observed=False)]
+                
+                # Clean subset for this pair
+                subset = combined[[dim_col, demo]].dropna()
+                if subset.empty:
+                    continue
+
+                groups = [group[dim_col].values for _, group in subset.groupby(demo, observed=False)]
                 groups = [g for g in groups if len(g) >= 2]
                 if len(groups) < 2:
                     continue
@@ -68,7 +75,7 @@ class AnovaSignificanceStrategy(IVisualizationStrategy):
                 if pd.isna(f_stat) or pd.isna(p_value):
                     continue
                 
-                # Eta-squared effect size: SS_between / SS_total
+                # Eta-squared effect size
                 all_data = np.concatenate(groups)
                 grand_mean = np.mean(all_data)
                 ss_total = np.sum((all_data - grand_mean)**2)
@@ -77,7 +84,8 @@ class AnovaSignificanceStrategy(IVisualizationStrategy):
 
                 significant_combos.append(
                     {
-                        "question_label": question,
+                        "dimension_key": dim_col,
+                        "dimension_label": prefix_label(dim_col.replace("DIM_", "")),
                         "group_variable": demo,
                         "p_value": p_value,
                         "f_stat": f_stat,
@@ -86,7 +94,7 @@ class AnovaSignificanceStrategy(IVisualizationStrategy):
                 )
 
         if not significant_combos:
-            raise ValueError("No significant differences detected")
+            raise ValueError("No significant dimension differences detected")
 
         # Limit to top-N most significant results
         top_n = int(config.get("top_n", 6))
@@ -96,24 +104,24 @@ class AnovaSignificanceStrategy(IVisualizationStrategy):
         plot_rows: List[Dict[str, Any]] = []
         alpha = 0.05
         for combo in top:
-            subset = long_df[long_df["question_label"] == combo["question_label"]].dropna(
-                subset=[combo["group_variable"]]
-            )
+            dim_key = combo["dimension_key"]
+            subset = combined[[dim_key, combo["group_variable"]]].dropna()
+            
             for group_value, group_df in subset.groupby(combo["group_variable"], observed=False):
-                vals = group_df["response_value"]
+                vals = group_df[dim_key]
                 n = len(vals)
                 mean = vals.mean()
                 std = vals.std()
-                # 95% Confidence Interval using t-distribution
+                # 95% Confidence Interval
                 ci = 0
                 if n > 1:
                     ci = stats.t.ppf(1 - alpha/2, n-1) * (std / np.sqrt(n))
 
                 plot_rows.append(
                     {
-                        "question_label": combo["question_label"],
+                        "dimension_label": combo["dimension_label"],
                         "group_variable": combo["group_variable"],
-                        "group_value": group_value,
+                        "group_value": str(group_value),
                         "mean": mean,
                         "lower": max(1, mean - ci),
                         "upper": min(5, mean + ci),
@@ -128,20 +136,26 @@ class AnovaSignificanceStrategy(IVisualizationStrategy):
         apply_theme()
 
         charts: List[alt.Chart] = []
-        for q in chart_df["question_label"].unique():
-            sub = chart_df[chart_df["question_label"] == q]
+        for d_label in chart_df["dimension_label"].unique():
+            sub = chart_df[chart_df["dimension_label"] == d_label]
             gv = sub["group_variable"].iloc[0]
             pv = sub["p_value"].iloc[0]
-            title = f"{q} (split: {gv}, p={pv:.3g})"
+            title = f"{d_label} (split: {gv}, p={pv:.3g})"
 
             base = alt.Chart(sub, title=title).encode(
                 x=alt.X("group_value:N", title=None, axis=alt.Axis(labelAngle=-45, labelLimit=100))
             )
 
-            bars = base.mark_bar(opacity=0.7).encode(
+            # Semantic coloring using a threshold scale
+            color_scale = alt.Scale(
+                domain=[2.5, 3.5],
+                range=["#EF4444", "#F59E0B", "#10B981"] # Red, Orange, Green
+            )
+
+            bars = base.mark_bar(opacity=0.8).encode(
                 y=alt.Y("mean:Q", title="Moyenne (1-5)", scale=alt.Scale(domain=[1, 5])),
-                y2=alt.datum(1), # Anchor bars to the Likert scale minimum (1)
-                color=alt.Color("group_value:N", legend=None),
+                y2=alt.datum(1),
+                color=alt.Color("mean:Q", scale=color_scale, legend=None),
                 tooltip=[
                     alt.Tooltip("group_value:N", title="Groupe"),
                     alt.Tooltip("mean:Q", title="Moyenne", format=".2f"),

@@ -108,9 +108,9 @@ def test_visualize_axis_layout(client, chart_key):
     bar_enc = _find_bar_with_x2(spec)
     assert isinstance(bar_enc, dict), f"{chart_key}: expected a bar encoding with 'x2' anchor"
     x2_obj = bar_enc.get("x2")
-    assert isinstance(x2_obj, dict) and x2_obj.get("value") is not None, f"{chart_key}: expected x2 anchor to have a numeric 'value'"
-    # Ensure x2 anchor is non-negative
-    assert float(x2_obj.get("value")) >= 0.0, f"{chart_key}: expected non-negative x2 anchor value"
+    assert isinstance(x2_obj, dict) and x2_obj.get("datum") is not None, f"{chart_key}: expected x2 anchor to have a numeric 'datum'"
+    # Ensure x2 anchor is at least 1.0 (Likert minimum)
+    assert float(x2_obj.get("datum")) >= 1.0, f"{chart_key}: expected x2 anchor datum >= 1.0"
 
     # Ensure left padding has been set to prevent bars overlapping y labels
     left_pad = _find_left_padding(spec)

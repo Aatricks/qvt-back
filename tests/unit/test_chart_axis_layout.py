@@ -85,7 +85,7 @@ def test_dimension_ci_bars_axis_and_height():
     # Bars should be anchored to the left domain bound via x2=1 (default Likert lower bound)
     x2 = enc.get("x2")
     assert x2 is not None, "dimension_ci_bars: expected 'x2' anchor to be present"
-    assert x2.get("value") in (1, 1.0), "dimension_ci_bars: expected 'x2' anchor value to be 1"
+    assert x2.get("datum") in (1, 1.0), "dimension_ci_bars: expected 'x2' anchor datum to be 1"
     left_pad = _find_left_padding(spec)
     assert left_pad is not None and float(left_pad) >= 120, "dimension_ci_bars: expected left padding >= 120"
     assert _has_height_step(spec, step=22), "dimension_ci_bars: expected chart height to include {'step': 22}"
