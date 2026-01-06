@@ -1,0 +1,50 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "qvt-back"
+version = "0.1.0"
+description = "QVCTi stateless visualization backend (FastAPI, Vega-Lite)"
+requires-python = ">=3.10"
+dependencies = [
+  "fastapi>=0.110",
+  "uvicorn[standard]>=0.23",
+  "pydantic>=1.10,<3",
+  "pydantic-settings>=2.2",
+  "pandas>=2.1",
+  "numpy>=1.26",
+  "scipy>=1.11",
+  "altair>=5.2",
+  "python-multipart>=0.0.9",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.4",
+  "pytest-asyncio>=0.21",
+  "httpx>=0.25",
+  "ruff>=0.4",
+  "black>=23.12",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+select = ["E", "F", "I"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+pythonpath = ["src"]
+markers = ["performance: performance and benchmark-style tests (may be slower)"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "pyproject.toml", "README.md"]
