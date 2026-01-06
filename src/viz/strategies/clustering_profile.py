@@ -17,7 +17,7 @@ from src.services.survey_utils import (
 from src.viz.base import IVisualizationStrategy
 from src.viz.theme import apply_theme
 
-# TODO: improve UI/UX 
+
 class ClusteringProfileStrategy(IVisualizationStrategy):
     """
     Segments respondents into clusters based on their QVT profile (Dimension scores).

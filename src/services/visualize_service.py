@@ -126,13 +126,28 @@ async def generate_chart(
     # Enforce survey presence for survey-based charts (before strategy execution)
     _require_survey_data_or_fail(hr_df=hr_df, survey_df=survey_df, chart_key=request.chart_key)
 
+    # 1. Cache lookup before validation/filtering (fast path)
+    cache_key = _get_cache_key(
+        request.chart_key, 
+        {"hr": hr_df, "survey": survey_df}, 
+        request.config or {}, 
+        request.filters or {}
+    )
+    if cache_key in _SPEC_CACHE:
+        log_event("chart_cache_hit", chart_key=request.chart_key)
+        cached = _SPEC_CACHE[cache_key].copy()
+        cached["generated_at"] = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        return cached
+
     if survey_df is not None:
         # Validate Likert range in both supported survey formats.
         if _has_long_survey_columns(survey_df):
             likert_errors = check_likert_range(survey_df, column="response_value")
         else:
             likert_cols = detect_likert_columns(survey_df)
-            likert_errors = check_likert_range(survey_df, column=likert_cols) if likert_cols else []
+            likert_errors = (
+                check_likert_range(survey_df, column=likert_cols) if likert_cols else []
+            )
 
         if likert_errors:
             raise ValidationFailure(
@@ -166,11 +181,36 @@ async def generate_chart(
             ) from exc
 
     log_event("chart_generated", chart_key=request.chart_key)
-    return {
+    result = {
         "chart_key": request.chart_key,
         "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "spec": spec,
     }
+
+    # Populate cache
+    if len(_SPEC_CACHE) >= MAX_CACHE_SIZE:
+        _SPEC_CACHE.clear() # Simple eviction
+    _SPEC_CACHE[cache_key] = result
+
+    return result
+
+
+# Cache for generated specs to avoid redundant heavy computations
+_SPEC_CACHE: Dict[tuple, Any] = {}
+MAX_CACHE_SIZE = 100
+
+
+def _get_cache_key(chart_key: str, data: Dict[str, pd.DataFrame], config: Dict, filters: Dict) -> tuple:
+    """Create a stable hashable key for request caching."""
+    # Using shape and column tuple as a proxy for dataset identity
+    data_id = tuple(
+        (k, df.shape, tuple(df.columns)) 
+        for k, df in data.items() if df is not None
+    )
+    # Convert dicts to sorted tuples for hashing
+    config_id = tuple(sorted((k, str(v)) for k, v in config.items()))
+    filter_id = tuple(sorted((k, str(v)) for k, v in filters.items()))
+    return (chart_key, data_id, config_id, filter_id)
 
 
 def _apply_filters(df: pd.DataFrame, filters: Dict[str, Any]) -> pd.DataFrame:

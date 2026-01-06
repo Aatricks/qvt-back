@@ -4,10 +4,6 @@ from typing import Any, Dict
 import pandas as pd
 
 
-# TODO: remove useless/redundant data viz
-# TODO: make the visualizations more interactive (selections, tooltips, ...)
-# TODO: add more chart types
-# TODO: don't re calculate everything from scratch if possible (caching, memoization)
 class IVisualizationStrategy(ABC):
     """Strategy for producing Vega-Lite spec from dataframes.
 
