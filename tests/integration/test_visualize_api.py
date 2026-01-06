@@ -11,10 +11,7 @@ FIXTURES = Path(__file__).parent.parent / "fixtures"
     "chart_key",
     [
         "likert_distribution",
-        "distribution_anomalies",
         "anova_significance",
-        "dimension_summary",
-        "importance_performance_matrix",
     ],
 )
 def test_visualize_success(client, chart_key):

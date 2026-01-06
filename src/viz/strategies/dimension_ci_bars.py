@@ -5,7 +5,6 @@ from typing import Any, Dict, Optional
 import altair as alt
 import numpy as np
 import pandas as pd
-from scipy import stats
 
 from src.services.qvt_metrics import compute_prefix_scores, prefix_label
 from src.services.survey_utils import add_age_band
@@ -14,22 +13,8 @@ from src.viz.theme import apply_theme
 
 
 class DimensionCIBarsStrategy(IVisualizationStrategy):
-    """Mean score per QVT dimension with confidence intervals.
-
-    This chart is meant as a "statistically responsible" companion to `dimension_summary`.
-
-    Key idea: compute a per-respondent score for each dimension (mean across the dimension's
-    items), then aggregate across respondents to get mean and 95% CI.
-
-    Config:
-      - segment_field (str, optional): demographic field to compare segments (e.g. "Sexe").
-      - min_n (int, optional): minimum respondents required per (dimension, segment) (default 30).
-      - max_segments (int, optional): maximum number of segment categories to keep (default 6).
-      - alpha (float, optional): CI alpha (default 0.05 for 95% CI).
-      - likert_domain (list|tuple, optional): bounds for x-axis (default [1, 5]).
-
-    Filters:
-      - applied as equality filters on existing columns.
+    """
+    Visualizes dimension mean scores with Standard Deviation as error bars to show dispersion.
     """
 
     def generate(
@@ -41,7 +26,7 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
     ) -> Dict[str, Any]:
         survey_df = data.get("survey")
         if survey_df is None:
-            raise ValueError("Survey data required for dimension CI bars")
+            raise ValueError("Survey data required for dimension dispersion bars")
 
         df = add_age_band(survey_df.copy())
 
@@ -75,7 +60,7 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
         long_df = long_df.dropna(subset=["score"])
 
         if long_df.empty:
-            raise ValueError("No usable Likert data for CI computation")
+            raise ValueError("No usable Likert data for dispersion computation")
 
         # DIM_<PREFIX> -> PREFIX
         long_df["dimension_prefix"] = (
@@ -108,20 +93,9 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
             .rename(columns={"mean": "mean_score", "std": "std_score", "count": "n"})
         )
 
-        # CI computation (t-based; falls back gracefully for n < 2)
-        alpha = float(config.get("alpha", 0.05))
-        agg["se"] = agg["std_score"] / np.sqrt(agg["n"].clip(lower=1))
-
-        def _tcrit(n: int) -> float:
-            if n is None or n < 2:
-                return float("nan")
-            return float(stats.t.ppf(1 - alpha / 2.0, df=n - 1))
-
-        agg["t_crit"] = agg["n"].apply(_tcrit)
-        agg["ci"] = agg["t_crit"] * agg["se"]
-
-        agg["lower"] = agg["mean_score"] - agg["ci"]
-        agg["upper"] = agg["mean_score"] + agg["ci"]
+        # Use Standard Deviation for error bars instead of CI
+        agg["lower"] = agg["mean_score"] - agg["std_score"]
+        agg["upper"] = agg["mean_score"] + agg["std_score"]
 
         # Clamp to Likert domain for display
         likert_domain = config.get("likert_domain", [1, 5])
@@ -146,7 +120,7 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
         x = alt.X(
             "mean_score:Q",
             title="Score moyen (1-5)",
-            scale=alt.Scale(domain=[0, hi]),
+            scale=alt.Scale(domain=[lo, hi]),
         )
         y = alt.Y(
             "dimension_label:N",
@@ -158,8 +132,9 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
         tooltip = [
             alt.Tooltip("dimension_label:N", title="Dimension"),
             alt.Tooltip("mean_score:Q", title="Moyenne", format=".2f"),
-            alt.Tooltip("lower:Q", title="Borne basse", format=".2f"),
-            alt.Tooltip("upper:Q", title="Borne haute", format=".2f"),
+            alt.Tooltip("std_score:Q", title="Écart-type", format=".2f"),
+            alt.Tooltip("lower:Q", title="Moyenne - 1 SD", format=".2f"),
+            alt.Tooltip("upper:Q", title="Moyenne + 1 SD", format=".2f"),
             alt.Tooltip("n:Q", title="Répondants"),
         ]
 
@@ -168,11 +143,11 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
 
         base = alt.Chart(agg)
 
-        # Error bars (CI)
+        # Error bars (Standard Deviation)
         if segment_field:
             eb = base.mark_errorbar().encode(
                 y=y,
-                x=alt.X("lower:Q", scale=alt.Scale(domain=[0, hi])),
+                x=alt.X("lower:Q", scale=alt.Scale(domain=[lo, hi])),
                 x2="upper:Q",
                 color=alt.Color(f"{segment_field}:N", title=segment_field),
                 tooltip=tooltip,
@@ -199,14 +174,14 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
             )
             eb = base.mark_errorbar().encode(
                 y=y,
-                x=alt.X("lower:Q", scale=alt.Scale(domain=[0, hi])),
+                x=alt.X("lower:Q", scale=alt.Scale(domain=[lo, hi])),
                 x2="upper:Q",
                 tooltip=tooltip,
             )
             chart = alt.layer(bars, eb).properties(height={"step": 22})
 
         chart = chart.properties(
-            title="Scores par dimension (moyenne et intervalle de confiance)",
+            title="Scores par dimension (moyenne et écart-type)",
             padding={"left": 120},
             width="container",
         )

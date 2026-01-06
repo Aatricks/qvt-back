@@ -4,6 +4,7 @@ from typing import Any, Dict
 import pandas as pd
 
 
+# TODO: remove useless/redundant data viz
 class IVisualizationStrategy(ABC):
     """Strategy for producing Vega-Lite spec from dataframes.
 

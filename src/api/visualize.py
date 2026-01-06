@@ -4,11 +4,11 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, File, Form, UploadFile, status
 from fastapi.responses import JSONResponse
 
+from src.config.observability import log_event
 from src.schemas.visualize import ChartRequest
 from src.services import visualize_service
 from src.services.error_builder import build_error
 from src.viz.registry import factory
-from src.config.observability import log_event
 
 router = APIRouter(tags=["visualize"])
 

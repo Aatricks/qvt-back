@@ -1,7 +1,7 @@
 import logging
 import time
 from contextlib import contextmanager
-from typing import Any, Dict, Iterator
+from typing import Any, Iterator
 
 logger = logging.getLogger("qvcti")
 logging.basicConfig(level=logging.INFO)

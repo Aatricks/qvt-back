@@ -47,7 +47,6 @@ def _has_height_step(spec: dict, step: int = 22) -> bool:
 @pytest.mark.parametrize(
     "chart_key",
     [
-        "dimension_summary",
         "dimension_ci_bars",
     ],
 )

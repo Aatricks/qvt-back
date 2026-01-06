@@ -4,6 +4,7 @@ from typing import Any, Dict, Optional
 import pandas as pd
 from fastapi import UploadFile
 
+import src.viz  # noqa: F401 ensures default strategies registered
 from src.config.observability import log_error, log_event, timed
 from src.config.settings import settings
 from src.schemas.datasets import HR_REQUIRED_COLUMNS, SURVEY_REQUIRED_COLUMNS
@@ -12,8 +13,6 @@ from src.services import data_loader
 from src.services.survey_utils import detect_likert_columns
 from src.services.validators import check_likert_range, missing_columns
 from src.viz.registry import factory
-import src.viz  # noqa: F401 ensures default strategies registered
-
 
 # Chart keys that require survey-style Likert data.
 # Survey data can be provided either as:
@@ -21,16 +20,9 @@ import src.viz  # noqa: F401 ensures default strategies registered
 #  - long format (question_label + response_value).
 SURVEY_CHART_KEYS = {
     "likert_distribution",
-    "distribution_anomalies",
     "anova_significance",
-    "dimension_summary",
     "dimension_mean_std_scatter",
     "dimension_ci_bars",
-    "eng_epui_quadrants",
-    "importance_performance_matrix",
-    "action_priority_index",
-    "leverage_scatter",
-    "predictive_simulation",
     "clustering_profile",
 }
 

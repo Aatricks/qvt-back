@@ -4,7 +4,12 @@ import altair as alt
 import pandas as pd
 from scipy.stats import f_oneway
 
-from src.services.survey_utils import add_age_band, available_demographics, detect_likert_columns, to_likert_long
+from src.services.survey_utils import (
+    add_age_band,
+    available_demographics,
+    detect_likert_columns,
+    to_likert_long,
+)
 from src.viz.base import IVisualizationStrategy
 from src.viz.theme import apply_theme
 
@@ -100,7 +105,7 @@ class AnovaSignificanceStrategy(IVisualizationStrategy):
                 .mark_bar()
                 .encode(
                     x=alt.X("group_value:N", title="Groupe", axis=alt.Axis(labelAngle=0, labelLimit=80)),
-                    y=alt.Y("mean_response:Q", title="Moyenne", scale=alt.Scale(domain=[0, 5])),
+                    y=alt.Y("mean_response:Q", title="Moyenne", scale=alt.Scale(domain=[1, 5])),
                     color=alt.Color("group_value:N", title="Groupe", legend=None),
                     tooltip=[
                         alt.Tooltip("question_label:N", title="Question"),

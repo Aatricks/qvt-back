@@ -1,10 +1,10 @@
 # qvt-back/tests/unit/test_chart_axis_layout.py
 
 from pathlib import Path
+
 import pandas as pd
 
 from src.viz.strategies.dimension_ci_bars import DimensionCIBarsStrategy
-from src.viz.strategies.dimension_summary import PracticeDimensionSummaryStrategy
 
 FIXTURES = Path(__file__).parent.parent / "fixtures"
 
@@ -89,22 +89,3 @@ def test_dimension_ci_bars_axis_and_height():
     left_pad = _find_left_padding(spec)
     assert left_pad is not None and float(left_pad) >= 120, "dimension_ci_bars: expected left padding >= 120"
     assert _has_height_step(spec, step=22), "dimension_ci_bars: expected chart height to include {'step': 22}"
-
-
-def test_dimension_summary_axis_and_height():
-    df = _load_pov()
-    strat = PracticeDimensionSummaryStrategy()
-    spec = strat.generate({"survey": df}, {}, {}, {})
-    enc = _find_encoding_with_y(spec)
-
-    axis = enc["y"].get("axis") if isinstance(enc.get("y"), dict) else None
-    assert axis is not None, "dimension_summary: 'y' encoding must contain an 'axis' object"
-    assert axis.get("labelLimit") == 260, "dimension_summary: expected y axis labelLimit == 260"
-    assert axis.get("labelPadding") == 8, "dimension_summary: expected y axis labelPadding == 8"
-    # Bars should be anchored to the left domain bound via x2=1
-    x2 = enc.get("x2")
-    assert x2 is not None, "dimension_summary: expected 'x2' anchor to be present"
-    assert x2.get("value") in (1, 1.0), "dimension_summary: expected 'x2' anchor value to be 1"
-    left_pad = _find_left_padding(spec)
-    assert left_pad is not None and float(left_pad) >= 120, "dimension_summary: expected left padding >= 120"
-    assert _has_height_step(spec, step=22), "dimension_summary: expected chart height to include {'step': 22}"
