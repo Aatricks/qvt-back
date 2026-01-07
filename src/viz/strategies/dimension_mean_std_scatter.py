@@ -16,7 +16,7 @@ from src.viz.theme import apply_theme
 
 class DimensionMeanStdScatterStrategy(IVisualizationStrategy):
     """
-    Nuage de points (bulle) par dimension : moyenne vs écart-type pour détecter la polarisation.
+    Nuage de points (bulle) par dimension : moyenne vs écart-type.
 
     Config attendue :
       - likert_domain (list|tuple, optionnel) : bornes de l'échelle Likert, défaut [1, 5].
@@ -41,7 +41,7 @@ class DimensionMeanStdScatterStrategy(IVisualizationStrategy):
             raise ValueError("Survey data required for dimension mean/std scatter")
 
         df = add_age_band(survey_df.copy())
-        
+
         # Apply value mappings for demographics (1 -> Homme, etc.)
         for col, mapping in DEMO_VALUE_MAPPING.items():
             if col in df.columns:
@@ -152,7 +152,7 @@ class DimensionMeanStdScatterStrategy(IVisualizationStrategy):
         chart = alt.layer(*layers).properties(
             width=600,
             height=500,
-            title="Analyse de la polarisation : Moyenne vs Écart-type"
+            title="Moyenne vs Écart-type"
         )
 
         return chart.interactive().to_dict()
