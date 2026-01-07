@@ -4,6 +4,7 @@ import altair as alt
 import pandas as pd
 
 from src.services.survey_utils import (
+    DEMO_VALUE_MAPPING,
     LIKERT_PREFIX_LABELS,
     add_age_band,
     detect_likert_columns,
@@ -40,6 +41,11 @@ class DimensionMeanStdScatterStrategy(IVisualizationStrategy):
             raise ValueError("Survey data required for dimension mean/std scatter")
 
         df = add_age_band(survey_df.copy())
+        
+        # Apply value mappings for demographics (1 -> Homme, etc.)
+        for col, mapping in DEMO_VALUE_MAPPING.items():
+            if col in df.columns:
+                df[col] = df[col].map(mapping).fillna(df[col])
 
         # Appliquer filtres simples (égalité)
         for key, value in (filters or {}).items():
@@ -64,9 +70,16 @@ class DimensionMeanStdScatterStrategy(IVisualizationStrategy):
             raise ValueError("Aucune donnée exploitable après conversion longue")
 
         min_responses = int(config.get("min_responses", 5))
+        segment_field: Optional[str] = config.get("segment_field")
+        if segment_field and segment_field not in df.columns:
+            raise ValueError(f"Segment field '{segment_field}' not found in dataset")
+
+        group_cols = ["dimension_label"]
+        if segment_field:
+            group_cols.append(segment_field)
 
         agg = (
-            long_df.groupby("dimension_label")["response_value"]
+            long_df.groupby(group_cols)["response_value"]
             .agg(["mean", "std", "count"])
             .reset_index()
             .rename(columns={"mean": "mean_score", "std": "std_dev", "count": "responses"})
@@ -99,19 +112,27 @@ class DimensionMeanStdScatterStrategy(IVisualizationStrategy):
 
         base = alt.Chart(agg)
 
+        color_encoding = alt.Color("mean_score:Q", title="Score moyen", scale=alt.Scale(scheme=color_scheme))
+        if segment_field:
+            color_encoding = alt.Color(f"{segment_field}:N", title=segment_field)
+
+        tooltip = [
+            "dimension_label",
+            alt.Tooltip("mean_score:Q", format=".2f", title="Moyenne"),
+            alt.Tooltip("std_dev:Q", format=".2f", title="Écart-type"),
+            alt.Tooltip("responses:Q", title="Réponses"),
+        ]
+        if segment_field:
+            tooltip.insert(1, alt.Tooltip(f"{segment_field}:N", title=segment_field))
+
         points = (
             base.mark_circle(opacity=0.8)
             .encode(
                 x=alt.X("mean_score:Q", title="Score moyen (1-5)", scale=alt.Scale(domain=likert_domain)),
                 y=alt.Y("std_dev:Q", title="Écart-type (dispersion)", scale=alt.Scale(zero=True)),
                 size=alt.Size("size:Q", title="Effectif", scale=alt.Scale(range=[50, max_size])),
-                color=alt.Color("mean_score:Q", title="Score moyen", scale=alt.Scale(scheme=color_scheme)),
-                tooltip=[
-                    "dimension_label",
-                    alt.Tooltip("mean_score:Q", format=".2f", title="Moyenne"),
-                    alt.Tooltip("std_dev:Q", format=".2f", title="Écart-type"),
-                    alt.Tooltip("responses:Q", title="Réponses"),
-                ],
+                color=color_encoding,
+                tooltip=tooltip,
             )
         )
 

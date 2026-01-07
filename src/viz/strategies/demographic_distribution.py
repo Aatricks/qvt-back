@@ -45,6 +45,17 @@ class DemographicDistributionStrategy(IVisualizationStrategy):
 
         apply_theme()
         field = config.get("field")
+        segment_field = config.get("segment_field")
+        facet_field = config.get("facet_field")
+
+        # Robustness: ignore segment/facet if not found in data
+        if segment_field and segment_field not in hr_df.columns:
+            segment_field = None
+        if facet_field and facet_field not in hr_df.columns:
+            facet_field = None
+            
+        # Update config for downstream use in _make_single_chart
+        config = {**config, "segment_field": segment_field, "facet_field": facet_field}
 
         if not field:
             # Multi-indicators mode: overview dashboard
@@ -55,45 +66,74 @@ class DemographicDistributionStrategy(IVisualizationStrategy):
             to_plot = to_plot[:6]
 
             if not to_plot:
+                # Fallback: if absolutely nothing is found, try any column
+                to_plot = [c for c in hr_df.columns if c not in {"ID", "Age", "Ancienne", "Ancienneté"}][:4]
+
+            if not to_plot:
                 raise ValueError("No demographic indicators detected for overview")
 
             charts: List[alt.Chart] = []
             for f in to_plot:
-                charts.append(self._make_single_chart(hr_df, f, config))
+                if f in hr_df.columns:
+                    charts.append(self._make_single_chart(hr_df, f, config))
+
+            if not charts:
+                 raise ValueError("No visualizable demographic indicators found")
 
             # Arrange in 2 or 3 columns
             cols = 3 if len(charts) > 3 else 2
             final = alt.concat(*charts, columns=cols).properties(
                 title="Aperçu de la composition de l'effectif"
             )
+            
+            if facet_field:
+                final = final.facet(column=alt.Column(f"{facet_field}:N", title=facet_field))
+
             return final.to_dict()
 
         # Single indicator mode
         if field not in hr_df.columns:
-            raise ValueError(f"Column '{field}' not found in dataset")
+            return alt.Chart().mark_text(text=f"Champ '{field}' absent du jeu de données").properties(width=400, height=200).to_dict()
 
-        return self._make_single_chart(hr_df, field, config).interactive().to_dict()
+        chart = self._make_single_chart(hr_df, field, config)
+        
+        if facet_field:
+            chart = chart.facet(column=alt.Column(f"{facet_field}:N", title=facet_field))
+
+        return chart.interactive().to_dict()
 
     def _make_single_chart(self, df: pd.DataFrame, field: str, config: Dict[str, Any]) -> alt.Chart:
         """Internal helper to create a single bar chart or histogram."""
         normalize = bool(config.get("normalize", True)) # Default to % for overview
+        segment_field = config.get("segment_field")
         series = df[field]
         
         # Binned fields should be treated as Nominal/Ordinal, not Quantitative
         is_binned = "Classe" in field or "tranche" in field.lower()
         is_numeric = pd.api.types.is_numeric_dtype(series) and not is_binned
         
-        subset = df[[field]].dropna().copy()
+        cols = [field]
+        if segment_field: cols.append(segment_field)
+        subset = df[cols].dropna().copy()
+        
         if subset.empty:
             return alt.Chart().mark_text().properties(title=f"{field} (no data)")
+
+        color = alt.value("#2563EB")
+        if segment_field:
+            color = alt.Color(f"{segment_field}:N", title=segment_field)
+
+        tooltip = [field, "count()"]
+        if segment_field: tooltip.insert(0, segment_field)
 
         if is_numeric:
             bin_size = config.get("bin_size")
             bin_params = {"step": bin_size} if bin_size else {"maxbins": 10}
             
-            base = alt.Chart(subset).mark_bar(opacity=0.8, color="#2563EB").encode(
+            base = alt.Chart(subset).mark_bar(opacity=0.8).encode(
                 x=alt.X(f"{field}:Q", bin=bin_params, title=field),
-                tooltip=[alt.Tooltip(f"{field}:Q", bin=bin_params, title="Tranche"), "count()"]
+                color=color,
+                tooltip=tooltip
             )
         else:
             sort = config.get("sort")
@@ -104,17 +144,20 @@ class DemographicDistributionStrategy(IVisualizationStrategy):
             else:
                 s = None
 
-            base = alt.Chart(subset).mark_bar(opacity=0.8, color="#2563EB").encode(
+            base = alt.Chart(subset).mark_bar(opacity=0.8).encode(
                 x=alt.X(f"{field}:N", sort=s, title=None, axis=alt.Axis(labelAngle=-45, labelLimit=100)),
-                tooltip=[field, "count()"]
+                color=color,
+                tooltip=tooltip
             )
 
         if normalize:
             # Transform to percentages using window transform (safer for concat)
+            group_by = [segment_field] if segment_field else []
             if is_numeric:
                 chart = base.transform_window(
                     total="count()",
-                    frame=[None, None]
+                    frame=[None, None],
+                    groupby=group_by
                 ).transform_calculate(
                     pct="datum.count / datum.total"
                 ).encode(
@@ -123,7 +166,8 @@ class DemographicDistributionStrategy(IVisualizationStrategy):
             else:
                 chart = base.transform_window(
                     total="count()",
-                    frame=[None, None]
+                    frame=[None, None],
+                    groupby=group_by
                 ).transform_calculate(
                     pct="1 / datum.total"
                 ).encode(

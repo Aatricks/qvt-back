@@ -116,11 +116,17 @@ class ClusteringProfileStrategy(IVisualizationStrategy):
 
         # 5. Demographic Composition Data (Stacked Bars)
         demo_fields = config.get("demographic_fields")
+        facet_field = config.get("facet_field")
+        
+        if facet_field and facet_field not in full_df.columns:
+            facet_field = None
+
         if not demo_fields:
             # Get all available demographics
             all_avail = available_demographics(full_df)
             # Filter out non-categorical/internal fields and raw numeric fields
             exclude = {"ID", "Age", "Ancienne", "Ancienneté"}
+            if facet_field: exclude.add(facet_field)
             demo_fields = [f for f in all_avail if f not in exclude]
 
         demo_charts = []
@@ -129,9 +135,16 @@ class ClusteringProfileStrategy(IVisualizationStrategy):
                 continue
 
             # Compute distribution for this field per cluster
-            counts = full_df.groupby(["label_with_n", field]).size().reset_index(name="sub_count")
-            totals = full_df.groupby("label_with_n").size().reset_index(name="cluster_total")
-            field_df = counts.merge(totals, on="label_with_n")
+            group_cols = ["label_with_n", field]
+            if facet_field: group_cols.append(facet_field)
+            
+            counts = full_df.groupby(group_cols, observed=False).size().reset_index(name="sub_count")
+            
+            total_group = ["label_with_n"]
+            if facet_field: total_group.append(facet_field)
+            totals = full_df.groupby(total_group, observed=False).size().reset_index(name="cluster_total")
+            
+            field_df = counts.merge(totals, on=total_group)
             field_df["percentage"] = field_df["sub_count"] / field_df["cluster_total"]
 
             # Ensure field values are strings for nominal encoding in Altair
@@ -167,6 +180,10 @@ class ClusteringProfileStrategy(IVisualizationStrategy):
                 )
                 .properties(width=80, height=alt.Step(40))
             )
+            
+            if facet_field:
+                d_chart = d_chart.facet(column=alt.Column(f"{facet_field}:N", title=facet_field))
+                
             demo_charts.append(d_chart)
 
 
@@ -178,6 +195,22 @@ class ClusteringProfileStrategy(IVisualizationStrategy):
             x=alt.X("dimension_label:N", title="Dimensions QVT", axis=alt.Axis(labelAngle=-45, labelLimit=150)),
             y=alt.Y("label_with_n:N", title="Profils Types identifiés"),
         )
+        
+        if facet_field:
+             # Recompute profile_long with facet
+             profile_long = full_df.melt(
+                id_vars=["label_with_n", facet_field],
+                value_vars=feature_cols,
+                var_name="dim_key",
+                value_name="mean_score",
+             )
+             profile_long = profile_long.groupby(["label_with_n", facet_field, "dim_key"], observed=False)["mean_score"].mean().reset_index()
+             profile_long["dimension"] = profile_long["dim_key"].str.replace("DIM_", "")
+             profile_long["dimension_label"] = profile_long["dimension"].apply(prefix_label)
+             base_heatmap = alt.Chart(profile_long).encode(
+                x=alt.X("dimension_label:N", title="Dimensions QVT", axis=alt.Axis(labelAngle=-45, labelLimit=150)),
+                y=alt.Y("label_with_n:N", title="Profils Types"),
+             )
 
         heatmap = base_heatmap.mark_rect().encode(
             color=alt.Color(
@@ -207,10 +240,12 @@ class ClusteringProfileStrategy(IVisualizationStrategy):
             height=alt.Step(40),
             title="Scores moyens par dimension"
         )
+        
+        if facet_field:
+            profile_chart = profile_chart.facet(column=alt.Column(f"{facet_field}:N", title=facet_field))
 
         if demo_charts:
             # Combine heatmap with all demographic bars.
-            # hconcat ensures they share the Y axis (Profils) visually.
             final_chart = alt.hconcat(
                 profile_chart,
                 *demo_charts,

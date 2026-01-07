@@ -5,12 +5,15 @@ from typing import Any, Dict, List, Optional
 import altair as alt
 import pandas as pd
 
-from src.services.survey_utils import add_age_band, detect_likert_columns, to_likert_long
+from src.services.survey_utils import (
+    DEMO_VALUE_MAPPING,
+    add_age_band,
+    detect_likert_columns,
+    to_likert_long,
+)
 from src.viz.base import IVisualizationStrategy
 from src.viz.theme import apply_theme
 
-# TODO: au lieu d'afficher les graphes filtrés pour une seule modalité on puisse les afficher pour toutes les modalités d'une catégorie/variable
-# TODO: qu'il soit possible de comparer des données de variables par rapport aux modalités d'une variable (exemple : comparer les moyennes des résultats de chaque variable des hommes avec celles des femmes)
 # TODO: charte graphique sur les couleurs
 class LikertDistributionStrategy(IVisualizationStrategy):
     """Diverging stacked bar distribution of Likert responses.
@@ -46,6 +49,12 @@ class LikertDistributionStrategy(IVisualizationStrategy):
             raise ValueError("Survey data required for likert distribution")
 
         df = add_age_band(survey_df.copy())
+        
+        # Apply value mappings for demographics (1 -> Homme, etc.)
+        for col, mapping in DEMO_VALUE_MAPPING.items():
+            if col in df.columns:
+                df[col] = df[col].map(mapping).fillna(df[col])
+
         for key, value in (filters or {}).items():
             if key in df.columns:
                 df = df[df[key] == value]
@@ -66,12 +75,21 @@ class LikertDistributionStrategy(IVisualizationStrategy):
         if segment_field and segment_field not in df.columns:
             raise ValueError(f"segment_field '{segment_field}' not found in dataset")
 
+        facet_field: Optional[str] = config.get("facet_field")
+        if facet_field and facet_field not in df.columns:
+            raise ValueError(f"facet_field '{facet_field}' not found in dataset")
+
         likert_cols = detect_likert_columns(df)
         if "question_label" not in df.columns or "response_value" not in df.columns:
             if not likert_cols:
                 raise ValueError("No Likert columns detected for distribution")
+            
+            id_vars = []
+            if segment_field: id_vars.append(segment_field)
+            if facet_field: id_vars.append(facet_field)
+            
             df = to_likert_long(
-                df, likert_cols, extra_id_vars=[segment_field] if segment_field else None
+                df, likert_cols, extra_id_vars=id_vars if id_vars else None
             )
         else:
             # Long format may not contain dimension_prefix.
@@ -92,6 +110,8 @@ class LikertDistributionStrategy(IVisualizationStrategy):
         group_cols: List[str] = ["question_label", "dimension_prefix"]
         if segment_field:
             group_cols.append(segment_field)
+        if facet_field:
+            group_cols.append(facet_field)
 
         def get_dist(target_df, group_vars):
             counts = (
@@ -131,6 +151,8 @@ class LikertDistributionStrategy(IVisualizationStrategy):
         cat_group_cols = ["dimension_prefix"]
         if segment_field:
             cat_group_cols.append(segment_field)
+        if facet_field:
+            cat_group_cols.append(facet_field)
         
         cat_counts = get_dist(df, cat_group_cols)
         cat_counts["is_category"] = True
@@ -223,8 +245,19 @@ class LikertDistributionStrategy(IVisualizationStrategy):
                     alt.Tooltip("net_agreement:Q", title="Net agreement", format=".1%"),
                 ],
             )
-            .properties(title="Distribution des réponses (Likert)", padding={"left": 10}, width="container")
-            .interactive()
         )
 
-        return chart.to_dict()
+        if facet_field:
+            chart = chart.facet(
+                column=alt.Column(f"{facet_field}:N", title=facet_field)
+            ).properties(
+                title=f"Distribution Likert par {facet_field}"
+            )
+        else:
+            chart = chart.properties(
+                title="Distribution des réponses (Likert)", 
+                padding={"left": 10}, 
+                width="container"
+            )
+
+        return chart.interactive().to_dict()

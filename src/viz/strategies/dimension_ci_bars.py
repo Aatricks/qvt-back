@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 from src.services.qvt_metrics import compute_prefix_scores, prefix_label
-from src.services.survey_utils import add_age_band
+from src.services.survey_utils import DEMO_VALUE_MAPPING, add_age_band
 from src.viz.base import IVisualizationStrategy
 from src.viz.theme import apply_theme
 
@@ -29,6 +29,11 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
             raise ValueError("Survey data required for dimension dispersion bars")
 
         df = add_age_band(survey_df.copy())
+        
+        # Apply value mappings for demographics (1 -> Homme, etc.)
+        for col, mapping in DEMO_VALUE_MAPPING.items():
+            if col in df.columns:
+                df[col] = df[col].map(mapping).fillna(df[col])
 
         # Apply simple equality filters
         for key, value in (filters or {}).items():
@@ -42,16 +47,24 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
         if segment_field and segment_field not in df.columns:
             raise ValueError(f"Segment field '{segment_field}' not found in dataset")
 
+        facet_field: Optional[str] = config.get("facet_field")
+        if facet_field and facet_field not in df.columns:
+            raise ValueError(f"Facet field '{facet_field}' not found in dataset")
+
         # Compute respondent-level dimension scores (DIM_<PREFIX> columns)
         dim_scores = compute_prefix_scores(df)
 
         # Build a long table
+        id_vars = []
+        if segment_field: id_vars.append(segment_field)
+        if facet_field: id_vars.append(facet_field)
+
         long_df = dim_scores.reset_index(drop=True)
-        if segment_field:
-            long_df[segment_field] = df[segment_field].reset_index(drop=True)
+        for f in id_vars:
+            long_df[f] = df[f].reset_index(drop=True)
 
         long_df = long_df.melt(
-            id_vars=[segment_field] if segment_field else None,
+            id_vars=id_vars if id_vars else None,
             var_name="dimension_key",
             value_name="score",
         )
@@ -70,21 +83,22 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
 
         # Optionally limit segments to most frequent values
         max_segments = int(config.get("max_segments", 6))
-        if segment_field:
-            counts = (
-                long_df[[segment_field]]
-                .dropna()
-                .value_counts()
-                .reset_index(name="n")
-                .sort_values("n", ascending=False)
-            )
-            keep = counts[segment_field].head(max_segments).tolist()
-            long_df = long_df[long_df[segment_field].isin(keep)]
+        for field in [segment_field, facet_field]:
+            if field:
+                counts = (
+                    long_df[[field]]
+                    .dropna()
+                    .value_counts()
+                    .reset_index(name="n")
+                    .sort_values("n", ascending=False)
+                )
+                keep = counts[field].head(max_segments).tolist()
+                long_df = long_df[long_df[field].isin(keep)]
 
         if long_df.empty:
-            raise ValueError("No usable data after segment limiting")
+            raise ValueError("No usable data after segment/facet limiting")
 
-        group_fields = ["dimension_label"] + ([segment_field] if segment_field else [])
+        group_fields = ["dimension_label"] + id_vars
 
         agg = (
             long_df.groupby(group_fields)["score"]
@@ -109,7 +123,7 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
         min_n = int(config.get("min_n", 30))
         agg["low_n"] = agg["n"] < min_n
 
-        # For sorting: overall mean per dimension (regardless of segment)
+        # For sorting: overall mean per dimension (regardless of segment/facet)
         overall = (
             long_df.groupby("dimension_label")["score"].mean().reset_index(name="overall_mean")
         )
@@ -140,26 +154,32 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
 
         if segment_field:
             tooltip.insert(1, alt.Tooltip(f"{segment_field}:N", title=segment_field))
+        if facet_field:
+            tooltip.insert(1, alt.Tooltip(f"{facet_field}:N", title=facet_field))
 
         base = alt.Chart(agg)
 
-        # Error bars (Standard Deviation)
+        # Use Grouped Bars when segment_field is present
         if segment_field:
-            eb = base.mark_errorbar().encode(
+            # Grouped bar chart: offset Y by segment
+            bars = base.mark_bar().encode(
                 y=y,
-                x=alt.X("lower:Q", scale=alt.Scale(domain=[lo, hi])),
-                x2="upper:Q",
-                color=alt.Color(f"{segment_field}:N", title=segment_field),
-                tooltip=tooltip,
-            )
-            pts = base.mark_point(filled=True, size=70).encode(
-                y=y,
+                yOffset=alt.YOffset(f"{segment_field}:N"),
                 x=x,
                 color=alt.Color(f"{segment_field}:N", title=segment_field),
-                shape=alt.Shape("low_n:N", title=f"n < {min_n}", legend=alt.Legend(orient="bottom")),
                 tooltip=tooltip,
             )
-            chart = (eb + pts).properties(height={"step": 22})
+            
+            eb = base.mark_errorbar().encode(
+                y=y,
+                yOffset=alt.YOffset(f"{segment_field}:N"),
+                x=alt.X("lower:Q", scale=alt.Scale(domain=[lo, hi])),
+                x2="upper:Q",
+                color=alt.value("black"), # Better contrast on colored bars
+                tooltip=tooltip,
+            )
+            
+            chart = (bars + eb).properties(height={"step": 30}) # Reduced step for thinner bars
         else:
             bars = base.mark_bar().encode(
                 y=y,
@@ -180,10 +200,17 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
             )
             chart = alt.layer(bars, eb).properties(height={"step": 22})
 
-        chart = chart.properties(
-            title="Scores par dimension (moyenne et écart-type)",
-            padding={"left": 120},
-            width="container",
-        )
+        if facet_field:
+            chart = chart.facet(
+                column=alt.Column(f"{facet_field}:N", title=facet_field)
+            ).properties(
+                title=f"Scores par dimension (moyenne et écart-type) par {facet_field}"
+            )
+        else:
+            chart = chart.properties(
+                title="Scores par dimension (moyenne et écart-type)",
+                padding={"left": 120, "right": 40},
+                width="container",
+            )
 
         return chart.interactive().to_dict()

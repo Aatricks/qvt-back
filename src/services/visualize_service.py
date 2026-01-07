@@ -126,12 +126,35 @@ async def generate_chart(
     # Enforce survey presence for survey-based charts (before strategy execution)
     _require_survey_data_or_fail(hr_df=hr_df, survey_df=survey_df, chart_key=request.chart_key)
 
+    # 0. Pre-process filters: if a filter has an empty value, treat it as a request for comparison
+    filters = request.filters or {}
+    config = request.config or {}
+    
+    clean_filters = {}
+    comparison_candidates = []
+    
+    for k, v in filters.items():
+        # Treat None, empty string, or literal "null" as unspecified
+        if v is None or str(v).strip() == "" or str(v).lower() == "null":
+            comparison_candidates.append(k)
+        else:
+            clean_filters[k] = v
+            
+    # Auto-assign empty filters to comparison slots if not already explicitly set in config
+    if comparison_candidates:
+        config = config.copy()
+        if not config.get("segment_field"):
+            config["segment_field"] = comparison_candidates.pop(0)
+        
+        if comparison_candidates and not config.get("facet_field"):
+            config["facet_field"] = comparison_candidates.pop(0)
+
     # 1. Cache lookup before validation/filtering (fast path)
     cache_key = _get_cache_key(
         request.chart_key, 
         {"hr": hr_df, "survey": survey_df}, 
-        request.config or {}, 
-        request.filters or {}
+        config, 
+        clean_filters
     )
     if cache_key in _SPEC_CACHE:
         log_event("chart_cache_hit", chart_key=request.chart_key)
@@ -158,16 +181,15 @@ async def generate_chart(
 
     # Apply filters robustly (handling string vs int mismatches) before passing to strategy
     # This ensures that frontend filters (always strings) match backend data (mixed types).
-    filters = request.filters or {}
-    hr_df = _apply_filters(hr_df, filters)
+    hr_df = _apply_filters(hr_df, clean_filters)
     if survey_df is not None:
-        survey_df = _apply_filters(survey_df, filters)
+        survey_df = _apply_filters(survey_df, clean_filters)
 
     with timed("generate_spec"):
         try:
             spec = strategy.generate(
                 data={"hr": hr_df, "survey": survey_df},
-                config=request.config or {},
+                config=config,
                 filters={},  # Filters already applied
                 settings=settings,
             )
