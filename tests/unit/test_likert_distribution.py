@@ -26,8 +26,8 @@ def test_likert_distribution_structure():
     # Check basic structure
     assert spec is not None
     assert "params" in spec
-    assert "facet" in spec
-    assert "spec" in spec
+    # We removed the dummy facet, so "facet" should NOT be in spec for this case (facet_field=None)
+    assert "facet" not in spec 
     
     # Check params
     params = spec["params"]
@@ -35,15 +35,7 @@ def test_likert_distribution_structure():
     assert "dim_select" in param_names, "Renamed parameter 'dim_select' should be present"
     assert "dimension" not in param_names, "Old parameter 'dimension' should not be present"
     
-    # Check that 'constant' is NOT used in transform_calculate inside the spec (since we moved it to pandas)
-    # It might be in the data though.
-    # The inner spec transform should NOT calculate constant.
-    inner_spec = spec["spec"]
-    transforms = inner_spec.get("transform", [])
-    calc_constant = any(t.get("calculate") == "1" and t.get("as") == "constant" for t in transforms)
-    assert not calc_constant, "constant should not be calculated in inner spec transform"
-    
-    # Check that filter using 'dim_select' is at the TOP LEVEL (facet chart)
+    # Check that filter using 'dim_select' is at the TOP LEVEL
     # This reflects the latest fix to ensure signal visibility.
     assert "transform" in spec
     top_transforms = spec["transform"]

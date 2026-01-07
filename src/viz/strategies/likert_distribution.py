@@ -186,7 +186,6 @@ class LikertDistributionStrategy(IVisualizationStrategy):
             )
 
         # Ensure constant field exists for faceting (avoid transform_calculate inside facet)
-        plot_df["constant"] = "1"
         base = alt.Chart(plot_df)
         
         # NOTE: Filter is applied at the TOP LEVEL (final_chart) to ensure 'dim_select' visibility.
@@ -245,12 +244,8 @@ class LikertDistributionStrategy(IVisualizationStrategy):
                 title=f"Distribution Likert par {facet_field}"
             )
         else:
-            # Wrap in a dummy facet to force the Y-axis to update when filtered interactively
-            final_chart = chart.facet(
-                row=alt.Row("constant:N", title=None, header=alt.Header(labels=False))
-            ).resolve_scale(
-                y="independent"
-            ).properties(
+            # Flattened view: No dummy facet. This ensures params and filters are in the same scope.
+            final_chart = chart.properties(
                 title="Distribution des réponses (Likert)"
             )
 
@@ -269,7 +264,7 @@ class LikertDistributionStrategy(IVisualizationStrategy):
                 (seg_param == "All") | (alt.datum[segment_field] == seg_param)
             )
 
-        # IMPORTANT: Interactive params must be added to the TOP-LEVEL chart (the facet)
+        # IMPORTANT: Interactive params must be added to the TOP-LEVEL chart
         if dim_param is not None:
             final_chart = final_chart.add_params(dim_param)
         if seg_param is not None:
