@@ -198,4 +198,8 @@ class DemographicDistributionStrategy(IVisualizationStrategy):
         else:
             chart = base.encode(y=alt.Y("count()", title=None))
 
-        return chart.properties(width=200, height=150, title=field)
+        # Dynamic width to prevent overlap in grouped bars
+        n_segments = subset[segment_field].nunique() if segment_field else 1
+        step_width = max(30, n_segments * 15)
+
+        return chart.properties(width={"step": step_width}, height=150, title=field)
