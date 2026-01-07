@@ -114,7 +114,8 @@ class DemographicDistributionStrategy(IVisualizationStrategy):
         is_numeric = pd.api.types.is_numeric_dtype(series) and not is_binned
         
         cols = [field]
-        if segment_field: cols.append(segment_field)
+        if segment_field and segment_field != field:
+            cols.append(segment_field)
         subset = df[cols].dropna().copy()
         
         if subset.empty:
