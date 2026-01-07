@@ -244,7 +244,9 @@ class LikertDistributionStrategy(IVisualizationStrategy):
                 title=f"Distribution Likert par {facet_field}"
             )
         else:
-            # Flattened view: No dummy facet. This ensures params and filters are in the same scope.
+            # Flattened view: No dummy facet. 
+            # This ensures params and filters are in the same scope, preventing "Unrecognized signal" errors
+            # and ensuring the Y-axis domain updates correctly (avoiding "ghost titles").
             final_chart = chart.properties(
                 title="Distribution des réponses (Likert)"
             )
