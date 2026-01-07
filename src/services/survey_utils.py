@@ -23,6 +23,7 @@ LIKERT_PREFIX_LABELS: Dict[str, str] = {
     "POV": "Pratiques organisationnelles vertueuses",
     "PGC": "Pratiques de gestion de carrière",
     "CSA": "Pratiques de santé et de sécurité",
+    "CSE": "Pratiques de santé et de sécurité",
     "EVPVP": "Pratiques de conciliation entre la vie privée et la vie personnelle",
     "RECO": "Pratiques de reconnaissance",
     "COM": "Pratiques de communication",
@@ -65,9 +66,9 @@ def _normalize_column_name(col: str) -> str:
 
 def _extract_prefix(column: str) -> str:
     upper = _normalize_column_name(column).upper()
-    for prefix in LIKERT_PREFIX_LABELS.keys():
+    for prefix, label in LIKERT_PREFIX_LABELS.items():
         if upper.startswith(prefix):
-            return prefix
+            return label
     return upper.rstrip("0123456789")
 
 

@@ -9,7 +9,9 @@ from src.services.survey_utils import add_age_band, detect_likert_columns, to_li
 from src.viz.base import IVisualizationStrategy
 from src.viz.theme import apply_theme
 
-
+# TODO: au lieu d'afficher les graphes filtrés pour une seule modalité on puisse les afficher pour toutes les modalités d'une catégorie/variable
+# TODO: qu'il soit possible de comparer des données de variables par rapport aux modalités d'une variable (exemple : comparer les moyennes des résultats de chaque variable des hommes avec celles des femmes)
+# TODO: charte graphique sur les couleurs
 class LikertDistributionStrategy(IVisualizationStrategy):
     """Diverging stacked bar distribution of Likert responses.
 
@@ -18,7 +20,7 @@ class LikertDistributionStrategy(IVisualizationStrategy):
         - long format with columns: question_label, response_value.
 
     Config:
-        - top_n (int): limit number of questions shown (default 25)
+        - top_n (int, ignored): formerly limited questions, now all questions are provided for hierarchical exploration.
         - focus ("lowest"|"highest"): which questions to keep by net agreement (default "lowest")
         - sort ("net_agreement"|"mean"): ordering metric within the kept set (default "net_agreement")
         - segment_field (str, optional): include segment in aggregation and expose an interactive dropdown
@@ -51,7 +53,7 @@ class LikertDistributionStrategy(IVisualizationStrategy):
         if df.empty:
             raise ValueError("Dataset vide après filtrage pour la distribution Likert")
 
-        top_n = int(config.get("top_n", 25))
+        # top_n is now ignored to ensure all questions are available in filtered mode
         focus = str(config.get("focus") or "lowest").lower()
         if focus not in {"lowest", "highest"}:
             raise ValueError("focus must be 'lowest' or 'highest'")
@@ -86,69 +88,58 @@ class LikertDistributionStrategy(IVisualizationStrategy):
         df["response_value"] = df["response_value"].astype(int)
         df = df[df["response_value"].between(1, 5)]
 
-        # --- Compute ranking stats per question (and optional segment) ---
-        group_cols: List[str] = ["question_label"]
+        # --- Compute distribution for QUESTIONS ---
+        group_cols: List[str] = ["question_label", "dimension_prefix"]
         if segment_field:
             group_cols.append(segment_field)
 
-        counts = (
-            df.groupby(group_cols + ["response_value"], dropna=False)
-            .size()
-            .rename("count")
-            .reset_index()
-        )
-        totals = counts.groupby(group_cols)["count"].transform("sum")
-        counts["total"] = totals
-        counts["share"] = counts["count"] / counts["total"].where(counts["total"] != 0, 1)
+        def get_dist(target_df, group_vars):
+            counts = (
+                target_df.groupby(group_vars + ["response_value"], dropna=False)
+                .size()
+                .rename("count")
+                .reset_index()
+            )
+            totals = counts.groupby(group_vars)["count"].transform("sum")
+            counts["total"] = totals
+            counts["share"] = counts["count"] / counts["total"].where(counts["total"] != 0, 1)
 
-        # Compute net agreement and mean score.
-        wide = counts.pivot_table(
-            index=group_cols,
-            columns="response_value",
-            values="count",
-            aggfunc="sum",
-            fill_value=0,
-        ).reset_index()
-        for k in [1, 2, 3, 4, 5]:
-            if k not in wide.columns:
-                wide[k] = 0
-        wide["total"] = wide[[1, 2, 3, 4, 5]].sum(axis=1)
-        # Avoid divide-by-zero.
-        denom = wide["total"].where(wide["total"] != 0, 1)
-        wide["mean"] = (wide[1] * 1 + wide[2] * 2 + wide[3] * 3 + wide[4] * 4 + wide[5] * 5) / denom
-        wide["net_agreement"] = ((wide[4] + wide[5]) - (wide[1] + wide[2])) / denom
+            wide = counts.pivot_table(
+                index=group_vars,
+                columns="response_value",
+                values="count",
+                aggfunc="sum",
+                fill_value=0,
+            ).reset_index()
+            for k in [1, 2, 3, 4, 5]:
+                if k not in wide.columns:
+                    wide[k] = 0
+            wide["total"] = wide[[1, 2, 3, 4, 5]].sum(axis=1)
+            denom = wide["total"].where(wide["total"] != 0, 1)
+            wide["mean"] = (wide[1] * 1 + wide[2] * 2 + wide[3] * 3 + wide[4] * 4 + wide[5] * 5) / denom
+            wide["net_agreement"] = ((wide[4] + wide[5]) - (wide[1] + wide[2])) / denom
 
-        counts = counts.merge(
-            wide[group_cols + ["mean", "net_agreement"]], on=group_cols, how="left"
-        )
+            return counts.merge(
+                wide[group_vars + ["mean", "net_agreement"]], on=group_vars, how="left"
+            )
 
-        # Keep top-N questions by net agreement (decision-aid: surface weakest/strongest first).
-        metric_series = counts.drop_duplicates(subset=group_cols)[
-            group_cols + ["net_agreement"]
-        ].copy()
-        if focus == "lowest":
-            metric_series = metric_series.sort_values("net_agreement", ascending=True)
-        else:
-            metric_series = metric_series.sort_values("net_agreement", ascending=False)
-        keep_keys = metric_series.head(top_n)[group_cols]
-        counts = counts.merge(keep_keys.assign(_keep=True), on=group_cols, how="left")
-        # Avoid pandas FutureWarning about fillna() downcasting on object dtype:
-        # after the merge, _keep is either True or NaN.
-        counts["_keep"] = counts["_keep"].eq(True)
-        counts = counts[counts["_keep"]].drop(columns=["_keep"])
+        q_counts = get_dist(df, group_cols)
+        q_counts["is_category"] = False
+        q_counts["display_label"] = q_counts["question_label"]
 
-        # Ensure dimension_prefix exists (for interactive filtering).
-        if "dimension_prefix" not in df.columns:
-            df = df.copy()
-            df["dimension_prefix"] = "NA"
-        dim_map = df[["question_label", "dimension_prefix"]].drop_duplicates()
-        counts = counts.merge(dim_map, on="question_label", how="left")
-
-        # --- Standard 100% Stacked Bar ---
-        # No negative shares, standard normalization.
-        plot_df = counts.copy()
+        # --- Compute distribution for CATEGORIES (Dimension prefixes) ---
+        cat_group_cols = ["dimension_prefix"]
+        if segment_field:
+            cat_group_cols.append(segment_field)
         
-        # Ordering: by chosen metric within the kept set
+        cat_counts = get_dist(df, cat_group_cols)
+        cat_counts["is_category"] = True
+        cat_counts["display_label"] = cat_counts["dimension_prefix"]
+        cat_counts["question_label"] = "Category Summary"
+
+        plot_df = pd.concat([cat_counts, q_counts], ignore_index=True)
+        
+        # We need a sort value that works for both categories and questions
         plot_df["sort_value"] = plot_df[sort_metric]
 
         dims = sorted([d for d in plot_df["dimension_prefix"].dropna().unique() if str(d).strip()])
@@ -172,10 +163,19 @@ class LikertDistributionStrategy(IVisualizationStrategy):
             )
 
         base = alt.Chart(plot_df)
+        
+        # Hierarchical filtering:
+        # If dimension == 'All', show only rows where is_category == True
+        # If dimension != 'All', show only rows where dimension_prefix == dimension AND is_category == False
         if dim_param is not None:
             base = base.add_params(dim_param).transform_filter(
-                (dim_param == "All") | (alt.datum.dimension_prefix == dim_param)
+                ((dim_param == "All") & (alt.datum.is_category == True)) |
+                ((dim_param != "All") & (alt.datum.dimension_prefix == dim_param) & (alt.datum.is_category == False))
             )
+        else:
+            # Fallback if no interactive dimension: show categories
+            base = base.transform_filter(alt.datum.is_category == True)
+
         if seg_param is not None and segment_field is not None:
             base = base.add_params(seg_param).transform_filter(
                 (seg_param == "All") | (getattr(alt.datum, segment_field) == seg_param)
@@ -190,12 +190,12 @@ class LikertDistributionStrategy(IVisualizationStrategy):
             base.mark_bar()
             .encode(
                 y=alt.Y(
-                    "question_label:N",
+                    "display_label:N",
                     sort=alt.SortField(
                         "sort_value", order="ascending" if focus == "lowest" else "descending"
                     ),
-                    title="Question",
-                    axis=alt.Axis(labelLimit=260, labelPadding=8),
+                    title="Catégorie / Question",
+                    axis=alt.Axis(labelLimit=350, labelPadding=8),
                 ),
                 x=alt.X(
                     "share:Q",
@@ -213,8 +213,9 @@ class LikertDistributionStrategy(IVisualizationStrategy):
                     legend=alt.Legend(title="Réponse (1–5)"),
                 ),
                 tooltip=[
-                    alt.Tooltip("question_label:N", title="Question"),
+                    alt.Tooltip("display_label:N", title="Label"),
                     alt.Tooltip("dimension_prefix:N", title="Dimension"),
+                    alt.Tooltip("is_category:N", title="Est une catégorie"),
                     alt.Tooltip("response_value:O", title="Réponse"),
                     alt.Tooltip("count:Q", title="N (segment)", format=".0f"),
                     alt.Tooltip("share:Q", title="Part", format=".1%"),
@@ -222,7 +223,7 @@ class LikertDistributionStrategy(IVisualizationStrategy):
                     alt.Tooltip("net_agreement:Q", title="Net agreement", format=".1%"),
                 ],
             )
-            .properties(title="Distribution des réponses (Likert)", padding={"left": 120}, width="container")
+            .properties(title="Distribution des réponses (Likert)", padding={"left": 10}, width="container")
             .interactive()
         )
 
