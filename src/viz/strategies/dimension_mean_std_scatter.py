@@ -149,6 +149,10 @@ class DimensionMeanStdScatterStrategy(IVisualizationStrategy):
             )
             layers.append(labels)
 
-        chart = alt.layer(*layers)
+        chart = alt.layer(*layers).properties(
+            width=600,
+            height=500,
+            title="Analyse de la polarisation : Moyenne vs Écart-type"
+        )
 
         return chart.interactive().to_dict()

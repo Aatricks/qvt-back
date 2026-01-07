@@ -28,7 +28,8 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
         if survey_df is None:
             raise ValueError("Survey data required for dimension dispersion bars")
 
-        df = add_age_band(survey_df.copy())
+        df = survey_df.copy()
+        df = df.loc[:, ~df.columns.duplicated()]
         
         # Apply value mappings for demographics (1 -> Homme, etc.)
         for col, mapping in DEMO_VALUE_MAPPING.items():
@@ -162,9 +163,9 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
         # Use Grouped Bars when segment_field is present
         if segment_field:
             # Grouped bar chart: offset Y by segment
-            bars = base.mark_bar().encode(
+            bars = base.mark_bar(size=10).encode( # Thinner bars
                 y=y,
-                yOffset=alt.YOffset(f"{segment_field}:N"),
+                yOffset=alt.YOffset(f"{segment_field}:N", scale=alt.Scale(padding=0)), # Remove inner padding
                 x=x,
                 color=alt.Color(f"{segment_field}:N", title=segment_field),
                 tooltip=tooltip,
@@ -172,16 +173,16 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
             
             eb = base.mark_errorbar().encode(
                 y=y,
-                yOffset=alt.YOffset(f"{segment_field}:N"),
+                yOffset=alt.YOffset(f"{segment_field}:N", scale=alt.Scale(padding=0)),
                 x=alt.X("lower:Q", scale=alt.Scale(domain=[lo, hi])),
                 x2="upper:Q",
                 color=alt.value("black"), # Better contrast on colored bars
                 tooltip=tooltip,
             )
             
-            chart = (bars + eb).properties(height={"step": 30}) # Reduced step for thinner bars
+            chart = (bars + eb).properties(height={"step": 18}) # Very compact rows
         else:
-            bars = base.mark_bar().encode(
+            bars = base.mark_bar(size=14).encode(
                 y=y,
                 x=x,
                 x2=alt.datum(lo),
@@ -198,7 +199,7 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
                 x2="upper:Q",
                 tooltip=tooltip,
             )
-            chart = alt.layer(bars, eb).properties(height={"step": 22})
+            chart = alt.layer(bars, eb).properties(height={"step": 18})
 
         if facet_field:
             chart = chart.facet(
@@ -210,7 +211,7 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
             chart = chart.properties(
                 title="Scores par dimension (moyenne et écart-type)",
                 padding={"left": 120, "right": 40},
-                width="container",
+                width=650, # Further reduced width
             )
 
         return chart.interactive().to_dict()

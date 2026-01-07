@@ -45,7 +45,10 @@ class ClusteringProfileStrategy(IVisualizationStrategy):
             # Assume shared index or ID column. If no common columns, we hope they are aligned.
             common = set(df.columns) & set(hr_df.columns)
             if "ID" in common:
-                df = df.merge(hr_df, on="ID", how="left", suffixes=("", "_hr"))
+                # Drop common columns from hr_df except ID to avoid duplicates
+                to_drop = [c for c in common if c != "ID"]
+                hr_clean = hr_df.drop(columns=to_drop)
+                df = df.merge(hr_clean, on="ID", how="left")
             elif df.index.equals(hr_df.index):
                 # If indices match perfectly, we can just join
                 for col in hr_df.columns:
@@ -55,6 +58,9 @@ class ClusteringProfileStrategy(IVisualizationStrategy):
         # Rename "Ancienne" to "Ancienneté" if present
         if "Ancienne" in df.columns:
             df = df.rename(columns={"Ancienne": "Ancienneté"})
+            
+        # Ensure column names are unique (final safety check)
+        df = df.loc[:, ~df.columns.duplicated()]
 
         # Apply value mappings for demographics (1 -> Homme, etc.)
         for col, mapping in DEMO_VALUE_MAPPING.items():
@@ -72,7 +78,9 @@ class ClusteringProfileStrategy(IVisualizationStrategy):
             raise ValueError("No dimension scores available for clustering.")
 
         # Combined dataset for clustering and demographics
-        full_df = pd.concat([df, scores_df], axis=1)
+        # Only concat columns from scores_df that are not already in df
+        to_concat = scores_df[[c for c in scores_df.columns if c not in df.columns]]
+        full_df = pd.concat([df, to_concat], axis=1)
         full_df = full_df.dropna(subset=feature_cols)
 
         if len(full_df) < 20:

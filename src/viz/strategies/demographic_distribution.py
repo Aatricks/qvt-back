@@ -27,8 +27,9 @@ class DemographicDistributionStrategy(IVisualizationStrategy):
         settings: Any,
     ) -> Dict[str, Any]:
         hr_df = data["hr"].copy()
-        hr_df = add_age_band(hr_df)
-        hr_df = add_seniority_band(hr_df)
+        
+        # Ensure column names are unique (final safety check)
+        hr_df = hr_df.loc[:, ~hr_df.columns.duplicated()]
 
         # Apply value mappings for demographics (1 -> Homme, etc.)
         for col, mapping in DEMO_VALUE_MAPPING.items():

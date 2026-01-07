@@ -48,7 +48,8 @@ class LikertDistributionStrategy(IVisualizationStrategy):
         if survey_df is None:
             raise ValueError("Survey data required for likert distribution")
 
-        df = add_age_band(survey_df.copy())
+        df = survey_df.copy()
+        df = df.loc[:, ~df.columns.duplicated()]
         
         # Apply value mappings for demographics (1 -> Homme, etc.)
         for col, mapping in DEMO_VALUE_MAPPING.items():
@@ -144,7 +145,7 @@ class LikertDistributionStrategy(IVisualizationStrategy):
             )
 
         q_counts = get_dist(df, group_cols)
-        q_counts["is_category"] = False
+        q_counts["is_category"] = 0
         q_counts["display_label"] = q_counts["question_label"]
 
         # --- Compute distribution for CATEGORIES (Dimension prefixes) ---
@@ -155,7 +156,7 @@ class LikertDistributionStrategy(IVisualizationStrategy):
             cat_group_cols.append(facet_field)
         
         cat_counts = get_dist(df, cat_group_cols)
-        cat_counts["is_category"] = True
+        cat_counts["is_category"] = 1
         cat_counts["display_label"] = cat_counts["dimension_prefix"]
         cat_counts["question_label"] = "Category Summary"
 
@@ -169,7 +170,7 @@ class LikertDistributionStrategy(IVisualizationStrategy):
         dim_param = None
         if interactive_dimension and dims:
             dim_param = alt.param(
-                name="dimension",
+                name="dim_select",
                 value="All",
                 bind=alt.binding_select(options=["All", *dims], name="Dimension: "),
             )
@@ -184,24 +185,12 @@ class LikertDistributionStrategy(IVisualizationStrategy):
                 bind=alt.binding_select(options=["All", *seg_vals], name=f"{segment_field}: "),
             )
 
+        # Ensure constant field exists for faceting (avoid transform_calculate inside facet)
+        plot_df["constant"] = "1"
         base = alt.Chart(plot_df)
         
-        # Hierarchical filtering:
-        # If dimension == 'All', show only rows where is_category == True
-        # If dimension != 'All', show only rows where dimension_prefix == dimension AND is_category == False
-        if dim_param is not None:
-            base = base.add_params(dim_param).transform_filter(
-                ((dim_param == "All") & (alt.datum.is_category == True)) |
-                ((dim_param != "All") & (alt.datum.dimension_prefix == dim_param) & (alt.datum.is_category == False))
-            )
-        else:
-            # Fallback if no interactive dimension: show categories
-            base = base.transform_filter(alt.datum.is_category == True)
-
-        if seg_param is not None and segment_field is not None:
-            base = base.add_params(seg_param).transform_filter(
-                (seg_param == "All") | (getattr(alt.datum, segment_field) == seg_param)
-            )
+        # NOTE: Filter is applied at the TOP LEVEL (final_chart) to ensure 'dim_select' visibility.
+        # We use integer check for is_category (1=True, 0=False) for robustness.
 
         color_scale = alt.Scale(
             domain=[1, 2, 3, 4, 5],
@@ -248,16 +237,42 @@ class LikertDistributionStrategy(IVisualizationStrategy):
         )
 
         if facet_field:
-            chart = chart.facet(
+            final_chart = chart.facet(
                 column=alt.Column(f"{facet_field}:N", title=facet_field)
+            ).resolve_scale(
+                y="independent"
             ).properties(
                 title=f"Distribution Likert par {facet_field}"
             )
         else:
-            chart = chart.properties(
-                title="Distribution des réponses (Likert)", 
-                padding={"left": 10}, 
-                width="container"
+            # Wrap in a dummy facet to force the Y-axis to update when filtered interactively
+            final_chart = chart.facet(
+                row=alt.Row("constant:N", title=None, header=alt.Header(labels=False))
+            ).resolve_scale(
+                y="independent"
+            ).properties(
+                title="Distribution des réponses (Likert)"
             )
 
-        return chart.interactive().to_dict()
+        # Apply filters to the TOP-LEVEL chart
+        if dim_param is not None:
+            final_chart = final_chart.transform_filter(
+                ((dim_param == "All") & (alt.datum.is_category == 1)) |
+                ((dim_param != "All") & (alt.datum.dimension_prefix == dim_param) & (alt.datum.is_category == 0))
+            )
+        else:
+            # Fallback
+            final_chart = final_chart.transform_filter(alt.datum.is_category == 1)
+
+        if seg_param is not None and segment_field is not None:
+            final_chart = final_chart.transform_filter(
+                (seg_param == "All") | (alt.datum[segment_field] == seg_param)
+            )
+
+        # IMPORTANT: Interactive params must be added to the TOP-LEVEL chart (the facet)
+        if dim_param is not None:
+            final_chart = final_chart.add_params(dim_param)
+        if seg_param is not None:
+            final_chart = final_chart.add_params(seg_param)
+
+        return final_chart.to_dict()
