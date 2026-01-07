@@ -141,14 +141,22 @@ class DemographicDistributionStrategy(IVisualizationStrategy):
         tooltip = [field, "count()"]
         if segment_field: tooltip.insert(0, segment_field)
 
+        encoding = {
+            "color": color,
+            "tooltip": tooltip
+        }
+        
+        # Grouped bars (xOffset) if comparison is active
+        if segment_field:
+            encoding["xOffset"] = alt.XOffset(f"{segment_field}:N")
+
         if is_numeric:
             bin_size = config.get("bin_size")
             bin_params = {"step": bin_size} if bin_size else {"maxbins": 10}
             
             base = alt.Chart(subset).mark_bar(opacity=0.8).encode(
                 x=alt.X(f"{field}:Q", bin=bin_params, title=field),
-                color=color,
-                tooltip=tooltip
+                **encoding
             )
         else:
             sort = config.get("sort")
@@ -161,8 +169,7 @@ class DemographicDistributionStrategy(IVisualizationStrategy):
 
             base = alt.Chart(subset).mark_bar(opacity=0.8).encode(
                 x=alt.X(f"{field}:N", sort=s, title=None, axis=alt.Axis(labelAngle=-45, labelLimit=100)),
-                color=color,
-                tooltip=tooltip
+                **encoding
             )
 
         if normalize:
