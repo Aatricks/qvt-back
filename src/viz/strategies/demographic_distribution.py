@@ -62,13 +62,26 @@ class DemographicDistributionStrategy(IVisualizationStrategy):
             # Multi-indicators mode: overview dashboard
             preferred = ["AgeClasse", "Sexe", "Contrat", "Secteur", "AnciennetéClasse", "Encadre"]
             available = available_demographics(hr_df)
-            to_plot = [f for f in preferred if f in hr_df.columns or f in available]
+            
+            # Identify redundant fields to skip in overview (they are already used for slicing/filtering)
+            to_skip = {segment_field, facet_field}
+            if filters:
+                to_skip.update(filters.keys())
+            
+            to_plot = [
+                f for f in preferred 
+                if (f in hr_df.columns or f in available) and f not in to_skip
+            ]
+            
             # Limit to top 6 for layout sanity
             to_plot = to_plot[:6]
 
             if not to_plot:
                 # Fallback: if absolutely nothing is found, try any column
-                to_plot = [c for c in hr_df.columns if c not in {"ID", "Age", "Ancienne", "Ancienneté"}][:4]
+                to_plot = [
+                    c for c in hr_df.columns 
+                    if c not in {"ID", "Age", "Ancienne", "Ancienneté"} and c not in to_skip
+                ][:4]
 
             if not to_plot:
                 raise ValueError("No demographic indicators detected for overview")
