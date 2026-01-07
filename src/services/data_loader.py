@@ -32,5 +32,8 @@ def read_bytes_to_df(data: bytes, filename: Optional[str]) -> pd.DataFrame:
         df = pd.read_csv(io.BytesIO(data), sep=sep)
     else:
         raise UnsupportedFileType(f"Unsupported file type: {extension or 'unknown'}")
+    
+    df = df.loc[:, ~df.columns.duplicated()]
+
     enforce_dimensions(df, max_rows=settings.max_rows, max_columns=settings.max_columns)
     return df

@@ -82,6 +82,8 @@ async def generate_chart(
         hr_bytes = await _read_upload(hr_file)
         try:
             hr_df = data_loader.read_bytes_to_df(hr_bytes, hr_file.filename)
+            # Global safety: ensure unique column names
+            hr_df = hr_df.loc[:, ~hr_df.columns.duplicated()]
             # Standardize age/seniority grouping early
             hr_df = add_age_band(hr_df)
             hr_df = add_seniority_band(hr_df)
@@ -104,6 +106,8 @@ async def generate_chart(
             survey_bytes = await _read_upload(survey_file)
             try:
                 survey_df = data_loader.read_bytes_to_df(survey_bytes, survey_file.filename)
+                # Global safety: ensure unique column names
+                survey_df = survey_df.loc[:, ~survey_df.columns.duplicated()]
                 # Standardize age/seniority grouping early
                 survey_df = add_age_band(survey_df)
                 survey_df = add_seniority_band(survey_df)

@@ -148,14 +148,14 @@ class DemographicDistributionStrategy(IVisualizationStrategy):
         
         # Grouped bars (xOffset) if comparison is active
         if segment_field:
-            encoding["xOffset"] = alt.XOffset(f"{segment_field}:N", padding=0.1)
+            encoding["xOffset"] = alt.XOffset(f"{segment_field}:N", scale=alt.Scale(paddingInner=0.05))
 
         if is_numeric:
             bin_size = config.get("bin_size")
             bin_params = {"step": bin_size} if bin_size else {"maxbins": 10}
             
             base = alt.Chart(subset).mark_bar(opacity=0.8).encode(
-                x=alt.X(f"{field}:Q", bin=bin_params, title=field, scale=alt.Scale(paddingInner=0.2)),
+                x=alt.X(f"{field}:Q", bin=bin_params, title=field, scale=alt.Scale(paddingInner=0.1)),
                 **encoding
             )
         else:
@@ -173,7 +173,7 @@ class DemographicDistributionStrategy(IVisualizationStrategy):
                     sort=s, 
                     title=None, 
                     axis=alt.Axis(labelAngle=-45, labelLimit=100),
-                    scale=alt.Scale(paddingInner=0.4)
+                    scale=alt.Scale(paddingInner=0.2)
                 ),
                 **encoding
             )
@@ -206,6 +206,6 @@ class DemographicDistributionStrategy(IVisualizationStrategy):
 
         # Dynamic width to prevent overlap in grouped bars, but conservative to keep it compact
         n_segments = subset[segment_field].nunique() if segment_field else 1
-        step_width = max(20, n_segments * 12)
+        step_width = max(12, n_segments * 8)
 
         return chart.properties(width={"step": step_width}, height=150, title=field)
