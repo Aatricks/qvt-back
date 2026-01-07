@@ -148,14 +148,14 @@ class DemographicDistributionStrategy(IVisualizationStrategy):
         
         # Grouped bars (xOffset) if comparison is active
         if segment_field:
-            encoding["xOffset"] = alt.XOffset(f"{segment_field}:N")
+            encoding["xOffset"] = alt.XOffset(f"{segment_field}:N", padding=0.1)
 
         if is_numeric:
             bin_size = config.get("bin_size")
             bin_params = {"step": bin_size} if bin_size else {"maxbins": 10}
             
             base = alt.Chart(subset).mark_bar(opacity=0.8).encode(
-                x=alt.X(f"{field}:Q", bin=bin_params, title=field),
+                x=alt.X(f"{field}:Q", bin=bin_params, title=field, scale=alt.Scale(paddingInner=0.2)),
                 **encoding
             )
         else:
@@ -168,7 +168,13 @@ class DemographicDistributionStrategy(IVisualizationStrategy):
                 s = None
 
             base = alt.Chart(subset).mark_bar(opacity=0.8).encode(
-                x=alt.X(f"{field}:N", sort=s, title=None, axis=alt.Axis(labelAngle=-45, labelLimit=100)),
+                x=alt.X(
+                    f"{field}:N", 
+                    sort=s, 
+                    title=None, 
+                    axis=alt.Axis(labelAngle=-45, labelLimit=100),
+                    scale=alt.Scale(paddingInner=0.4)
+                ),
                 **encoding
             )
 
@@ -198,8 +204,8 @@ class DemographicDistributionStrategy(IVisualizationStrategy):
         else:
             chart = base.encode(y=alt.Y("count()", title=None))
 
-        # Dynamic width to prevent overlap in grouped bars
+        # Dynamic width to prevent overlap in grouped bars, but conservative to keep it compact
         n_segments = subset[segment_field].nunique() if segment_field else 1
-        step_width = max(30, n_segments * 15)
+        step_width = max(20, n_segments * 12)
 
         return chart.properties(width={"step": step_width}, height=150, title=field)
