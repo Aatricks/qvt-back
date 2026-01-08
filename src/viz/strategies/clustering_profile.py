@@ -22,7 +22,7 @@ class ClusteringProfileStrategy(IVisualizationStrategy):
     """
     Segments respondents into clusters based on their QVT profile (Dimension scores).
     Automatically selects the optimal number of clusters k.
-    Visualizes the average dimension profile (heatmap) and demographic composition (bars).
+    Visualizes the average dimension profile (line chart) and demographic composition.
     """
 
     def generate(
@@ -38,36 +38,28 @@ class ClusteringProfileStrategy(IVisualizationStrategy):
             raise ValueError("Survey and HR data required for clustering profile")
 
         # 1. Prepare Data
-        # Merge survey and HR to have demographics and scores together
         df = add_age_band(survey_df.copy())
         df = add_seniority_band(df)
         if hr_df is not None and not hr_df.empty:
-            # Assume shared index or ID column. If no common columns, we hope they are aligned.
             common = set(df.columns) & set(hr_df.columns)
             if "ID" in common:
-                # Drop common columns from hr_df except ID to avoid duplicates
                 to_drop = [c for c in common if c != "ID"]
                 hr_clean = hr_df.drop(columns=to_drop)
                 df = df.merge(hr_clean, on="ID", how="left")
             elif df.index.equals(hr_df.index):
-                # If indices match perfectly, we can just join
                 for col in hr_df.columns:
                     if col not in df.columns:
                         df[col] = hr_df[col]
 
-        # Rename "Ancienne" to "Ancienneté" if present
         if "Ancienne" in df.columns:
             df = df.rename(columns={"Ancienne": "Ancienneté"})
             
-        # Ensure column names are unique (final safety check)
         df = df.loc[:, ~df.columns.duplicated()]
 
-        # Apply value mappings for demographics (1 -> Homme, etc.)
         for col, mapping in DEMO_VALUE_MAPPING.items():
             if col in df.columns:
                 df[col] = df[col].map(mapping).fillna(df[col])
 
-        # Apply filters
         for key, value in (filters or {}).items():
             if key in df.columns:
                 df = df[df[key] == value]
@@ -77,8 +69,6 @@ class ClusteringProfileStrategy(IVisualizationStrategy):
         if not feature_cols:
             raise ValueError("No dimension scores available for clustering.")
 
-        # Combined dataset for clustering and demographics
-        # Only concat columns from scores_df that are not already in df
         to_concat = scores_df[[c for c in scores_df.columns if c not in df.columns]]
         full_df = pd.concat([df, to_concat], axis=1)
         full_df = full_df.dropna(subset=feature_cols)
@@ -92,7 +82,7 @@ class ClusteringProfileStrategy(IVisualizationStrategy):
         except Exception:
             features_std = features
 
-        # 2. Automatic k Selection (Heuristic based on distortion reduction)
+        # 2. Automatic k Selection
         k = self._select_best_k(features_std, config)
 
         # 3. Clustering Execution
@@ -102,213 +92,162 @@ class ClusteringProfileStrategy(IVisualizationStrategy):
             raise ValueError(f"Clustering failed: {str(e)}")
 
         full_df["cluster"] = labels
-        full_df["cluster_label"] = full_df["cluster"].apply(lambda x: f"Profil {x+1}")
+        full_df["cluster_label"] = full_df["cluster"].apply(lambda x: f"Segment {x+1}")
 
-        # Cluster sizes
         cluster_sizes = full_df.groupby("cluster_label").size().reset_index(name="count")
         full_df = full_df.merge(cluster_sizes, on="cluster_label")
         full_df["label_with_n"] = full_df.apply(
             lambda r: f"{r['cluster_label']} (n={r['count']})", axis=1
         )
 
-        # 4. Dimension Profile Data (Heatmap)
+        # 4. Dimension Profile Data
         profile_long = full_df.melt(
-            id_vars=["label_with_n"],
+            id_vars=["label_with_n", "cluster_label", "count"],
             value_vars=feature_cols,
             var_name="dim_key",
             value_name="mean_score",
         )
-        profile_long = profile_long.groupby(["label_with_n", "dim_key"])["mean_score"].mean().reset_index()
+        profile_long = profile_long.groupby(["label_with_n", "cluster_label", "count", "dim_key"], observed=False)["mean_score"].mean().reset_index()
         profile_long["dimension"] = profile_long["dim_key"].str.replace("DIM_", "")
         profile_long["dimension_label"] = profile_long["dimension"].apply(prefix_label)
 
-        # 5. Demographic Composition Data (Stacked Bars)
+        # 5. Demographic Composition
         demo_fields = config.get("demographic_fields")
-        facet_field = config.get("facet_field")
-        
-        if facet_field and facet_field not in full_df.columns:
-            facet_field = None
-
         if not demo_fields:
-            # Get all available demographics
             all_avail = available_demographics(full_df)
-            # Filter out non-categorical/internal fields and raw numeric fields
             exclude = {"ID", "Age", "Ancienne", "Ancienneté"}
-            if facet_field: exclude.add(facet_field)
-            demo_fields = [f for f in all_avail if f not in exclude]
+            # Include more demographics to "represent everything"
+            demo_fields = [f for f in all_avail if f not in exclude][:6]
 
-        demo_charts = []
+        demo_data_list = []
         for field in demo_fields:
-            if field not in full_df.columns:
-                continue
-
-            # Compute distribution for this field per cluster
-            group_cols = ["label_with_n", field]
-            if facet_field: group_cols.append(facet_field)
-            
-            counts = full_df.groupby(group_cols, observed=False).size().reset_index(name="sub_count")
-            
-            total_group = ["label_with_n"]
-            if facet_field: total_group.append(facet_field)
-            totals = full_df.groupby(total_group, observed=False).size().reset_index(name="cluster_total")
-            
-            field_df = counts.merge(totals, on=total_group)
-            field_df["percentage"] = field_df["sub_count"] / field_df["cluster_total"]
-
-            # Ensure field values are strings for nominal encoding in Altair
-            field_df[field] = field_df[field].astype(str)
-
-            # Narrower stacked bar for each demographic to respect horizontal space
-            d_chart = (
-                alt.Chart(field_df)
-                .mark_bar()
-                .encode(
-                    y=alt.Y("label_with_n:N", title=None, axis=alt.Axis(labels=False, ticks=False)),
-                    x=alt.X(
-                        "percentage:Q",
-                        title=field,
-                        axis=alt.Axis(format="%", ticks=False, labels=False, grid=False)
-                    ),
-                    color=alt.Color(
-                        f"{field}:N",
-                        title=field,
-                        legend=alt.Legend(
-                            orient="bottom",
-                            columns=2,
-                            titleFontSize=10,
-                            labelFontSize=9,
-                            symbolSize=40
-                        )
-                    ),
-                    tooltip=[
-                        alt.Tooltip("label_with_n", title="Profil"),
-                        alt.Tooltip(f"{field}:N", title=field),
-                        alt.Tooltip("percentage:Q", format=".1%", title="Proportion"),
-                    ],
-                )
-                .properties(width=80, height=alt.Step(40))
-            )
-            
-            if facet_field:
-                d_chart = d_chart.facet(column=alt.Column(f"{facet_field}:N", title=facet_field))
-                
-            demo_charts.append(d_chart)
-
+            if field not in full_df.columns: continue
+            counts = full_df.groupby(["cluster_label", field], observed=False).size().reset_index(name="n")
+            totals = full_df.groupby("cluster_label", observed=False).size().reset_index(name="total")
+            merged = counts.merge(totals, on="cluster_label")
+            merged["percentage"] = merged["n"] / merged["total"]
+            merged["variable"] = field
+            merged = merged.rename(columns={field: "value"})
+            demo_data_list.append(merged[["cluster_label", "variable", "value", "percentage", "n"]])
+        
+        demo_df = pd.concat(demo_data_list) if demo_data_list else pd.DataFrame()
 
         # 6. Visualization
         apply_theme()
-
-        # Main Profile Heatmap
-        base_heatmap = alt.Chart(profile_long).encode(
-            x=alt.X("dimension_label:N", title="Dimensions QVT", axis=alt.Axis(labelAngle=-45, labelLimit=150)),
-            y=alt.Y("label_with_n:N", title="Profils Types identifiés"),
-        )
         
-        if facet_field:
-             # Recompute profile_long with facet
-             profile_long = full_df.melt(
-                id_vars=["label_with_n", facet_field],
-                value_vars=feature_cols,
-                var_name="dim_key",
-                value_name="mean_score",
-             )
-             profile_long = profile_long.groupby(["label_with_n", facet_field, "dim_key"], observed=False)["mean_score"].mean().reset_index()
-             profile_long["dimension"] = profile_long["dim_key"].str.replace("DIM_", "")
-             profile_long["dimension_label"] = profile_long["dimension"].apply(prefix_label)
-             base_heatmap = alt.Chart(profile_long).encode(
-                x=alt.X("dimension_label:N", title="Dimensions QVT", axis=alt.Axis(labelAngle=-45, labelLimit=150)),
-                y=alt.Y("label_with_n:N", title="Profils Types"),
-             )
+        segment_colors = alt.Scale(
+            domain=sorted(full_df["cluster_label"].unique()),
+            range=["#4F46E5", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"]
+        )
 
-        heatmap = base_heatmap.mark_rect().encode(
+        # --- CHART 1: Profile Signature (Line) ---
+        profile_line = alt.Chart(profile_long).mark_line(
+            strokeWidth=3, 
+            interpolate="monotone",
+            opacity=0.85
+        ).encode(
+            x=alt.X("dimension_label:N", title=None, axis=alt.Axis(labelAngle=-45, labelLimit=150, labelFontSize=10)),
+            y=alt.Y("mean_score:Q", title="Score Moyen", scale=alt.Scale(domain=[1, 5]), axis=alt.Axis(grid=True, gridDash=[2,2])),
+            color=alt.Color("cluster_label:N", scale=segment_colors, legend=alt.Legend(title="Segments", orient="top-left", offset=10)),
+            tooltip=[
+                alt.Tooltip("cluster_label", title="Segment"),
+                alt.Tooltip("dimension_label", title="Dimension"),
+                alt.Tooltip("mean_score:Q", format=".2f", title="Moyenne"),
+            ]
+        )
+
+        profile_points = profile_line.mark_point(size=80, filled=True, opacity=1).encode(opacity=alt.value(1))
+
+        profile_view = (profile_line + profile_points).properties(
+            width=550,
+            height=320,
+            title=alt.TitleParams(
+                text="Signature de Réponse par Segment",
+                subtitle="Profil psychométrique moyen des groupes de collaborateurs identifiés.",
+                fontSize=14, anchor="start", color="#1E293B"
+            )
+        )
+
+        # --- CHART 2: Segment Size (Reduced gaps) ---
+        size_chart = alt.Chart(cluster_sizes).mark_bar(cornerRadius=4, size=24).encode(
+            y=alt.Y("cluster_label:N", title=None, axis=alt.Axis(labelFontSize=10)),
+            x=alt.X("count:Q", title="Nombre de répondants", axis=alt.Axis(grid=True, gridDash=[2,2])),
+            color=alt.Color("cluster_label:N", scale=segment_colors, legend=None),
+            tooltip=[alt.Tooltip("cluster_label", title="Segment"), alt.Tooltip("count:Q", title="Effectif")]
+        ).properties(
+            width=180, 
+            height=alt.Step(45), # Tight gaps proportional to bar size
+            title=alt.TitleParams(text="Répartition Numérique", fontSize=12, anchor="start", color="#475569")
+        )
+
+        # --- CHART 3: Demographic Composition (Stacked Bars) ---
+        demo_bars = alt.Chart(demo_df).mark_bar(cornerRadius=2).encode(
+            y=alt.Y("cluster_label:N", title=None, axis=alt.Axis(labelFontSize=10)),
+            x=alt.X("percentage:Q", title=None, axis=alt.Axis(format="%", grid=False, labels=False)),
             color=alt.Color(
-                "mean_score:Q",
-                scale=alt.Scale(domain=[1, 5], scheme="redyellowgreen"),
-                title="Score Moyen",
-                legend=alt.Legend(orient="left", title="Score")
+                "value:N", 
+                title=None, 
+                scale=alt.Scale(scheme="tableau20"),
+                legend=alt.Legend(orient="bottom", columns=2, labelFontSize=9, symbolSize=40, padding=10)
             ),
             tooltip=[
-                alt.Tooltip("label_with_n", title="Profil"),
-                alt.Tooltip("dimension_label", title="Dimension"),
-                alt.Tooltip("mean_score:Q", format=".2f", title="Score Moyen"),
-            ],
-        )
+                alt.Tooltip("cluster_label", title="Segment"),
+                alt.Tooltip("variable", title="Critère"),
+                alt.Tooltip("value", title="Catégorie"),
+                alt.Tooltip("percentage:Q", format=".1%", title="Proportion"),
+                alt.Tooltip("n:Q", title="Effectif"),
+            ]
+        ).properties(width=180, height=alt.Step(30))
 
-        text = base_heatmap.mark_text(size=10, fontWeight="bold").encode(
-            text=alt.Text("mean_score:Q", format=".1f"),
-            color=alt.condition(
-                (alt.datum.mean_score < 2.2) | (alt.datum.mean_score > 4.2),
-                alt.value("white"),
-                alt.value("black"),
-            ),
-        )
+        facet_demo = demo_bars.facet(
+            facet=alt.Facet("variable:N", title=None, header=alt.Header(labelFontSize=11, labelFontWeight="bold", labelColor="#4F46E5")),
+            columns=3,
+            spacing=30
+        ).resolve_scale(color="independent")
 
-        profile_chart = (heatmap + text).properties(
-            width=300,
-            height=alt.Step(40),
-            title="Scores moyens par dimension"
-        )
+        # Layout Assembly
+        top_row = alt.hconcat(profile_view, size_chart, spacing=50).resolve_scale(color="shared")
         
-        if facet_field:
-            profile_chart = profile_chart.facet(column=alt.Column(f"{facet_field}:N", title=facet_field))
+        final_chart = alt.vconcat(
+            top_row,
+            facet_demo,
+            spacing=60
+        ).properties(
+            title={
+                "text": "Analyse Structurelle des Segments Collaborateurs",
+                "subtitle": [
+                    f"Segmentation automatique regroupant n={len(full_df)} collaborateurs en {k} profils types.",
+                    "Le haut du rapport définit le comportement de réponse ; le bas révèle l'identité sociodémographique de chaque groupe."
+                ],
+                "anchor": "start",
+                "fontSize": 18,
+                "fontWeight": 700,
+                "color": "#1E293B",
+                "subtitleColor": "#64748B",
+                "subtitleFontSize": 12,
+                "dy": -25
+            }
+        ).configure_view(stroke=None).configure_concat(spacing=60)
 
-        if demo_charts:
-            # Combine heatmap with all demographic bars.
-            final_chart = alt.hconcat(
-                profile_chart,
-                *demo_charts,
-                spacing=5
-            ).resolve_scale(y="shared")
-        else:
-            final_chart = profile_chart
-
-        return (
-            final_chart.properties(
-                title={
-                    "text": "Segmentation des profils types et composition démographique",
-                    "subtitle": [f"Nombre de clusters (k={k}) déterminé automatiquement par analyse de variance."],
-                    "anchor": "start",
-                    "frame": "group"
-                }
-            )
-            .to_dict()
-        )
+        return final_chart.to_dict()
 
     def _select_best_k(self, features: np.ndarray, config: Dict[str, Any]) -> int:
-        """Heuristic to select k between 2 and 6 based on distortion reduction."""
-        if "k" in config:
-            return int(config["k"])
-
+        if "k" in config: return int(config["k"])
         n_samples = features.shape[0]
         max_k = min(6, n_samples // 5)
-        if max_k < 2:
-            return 2
-
+        if max_k < 2: return 2
         distortions = []
-        ks = range(1, max_k + 1)
-        for k in ks:
+        for k in range(1, max_k + 1):
             _, dist = kmeans(features, k)
             distortions.append(dist)
-
-        if len(distortions) < 2:
-            return 2
-
-        # Use the "Elbow" logic: find k where the drop in distortion slows down significantly.
-        # We look for the maximum 'curvature' or just the biggest drop in relative distortion.
+        if len(distortions) < 2: return 2
         deltas = np.diff(distortions)
-        # Relative improvement: (D_k-1 - D_k) / D_k-1
         rel_improvement = [-deltas[i] / distortions[i] for i in range(len(deltas))]
-
-        # Default to 3 if we have enough data and no obvious elbow
         best_k = 3 if max_k >= 3 else 2
-
-        # If k=2 provides more than 25% improvement over k=1, keep looking
-        # If k=3 provides another 15% improvement over k=2, take it.
         if rel_improvement[0] > 0.2:
             best_k = 2
             if len(rel_improvement) > 1 and rel_improvement[1] > 0.12:
                 best_k = 3
                 if len(rel_improvement) > 2 and rel_improvement[2] > 0.08:
                     best_k = 4
-
         return best_k
