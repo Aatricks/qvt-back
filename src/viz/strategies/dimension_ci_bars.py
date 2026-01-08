@@ -141,7 +141,7 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
             "dimension_label:N",
             title="Dimension QVCT",
             sort=alt.SortField(field="overall_mean", order="descending"),
-            axis=alt.Axis(labelLimit=260, labelPadding=8),
+            axis=alt.Axis(labelLimit=150, labelPadding=8),
         )
 
         tooltip = [
@@ -210,8 +210,7 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
         else:
             chart = chart.properties(
                 title="Scores par dimension (moyenne et écart-type)",
-                padding={"left": 120, "right": 40},
-                width=650, # Further reduced width
+                width=350, # Reduced width to fit 2-col grid
             )
 
         return chart.interactive().to_dict()
