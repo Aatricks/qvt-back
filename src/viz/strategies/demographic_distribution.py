@@ -135,7 +135,9 @@ class DemographicDistributionStrategy(IVisualizationStrategy):
             return alt.Chart().mark_text().properties(title=f"{field} (no data)")
 
         color = alt.value("#4F46E5")
+        highlight = None
         if segment_field:
+            highlight = alt.selection_point(on="mouseover", fields=[segment_field], nearest=False)
             color = alt.Color(f"{segment_field}:N", title=None, legend=alt.Legend(orient="bottom", titleFontSize=10, labelFontSize=9))
 
         tooltip = [alt.Tooltip(field, title="Catégorie"), alt.Tooltip("count()", title="Effectif")]
@@ -147,6 +149,9 @@ class DemographicDistributionStrategy(IVisualizationStrategy):
             "tooltip": tooltip
         }
         
+        if highlight:
+            encoding["opacity"] = alt.condition(highlight, alt.value(1), alt.value(0.3))
+
         # Grouped bars (xOffset) if comparison is active
         if segment_field:
             encoding["xOffset"] = alt.XOffset(f"{segment_field}:N", scale=alt.Scale(paddingInner=0.1))
@@ -155,7 +160,7 @@ class DemographicDistributionStrategy(IVisualizationStrategy):
             bin_size = config.get("bin_size")
             bin_params = {"step": bin_size} if bin_size else {"maxbins": 10}
             
-            base = alt.Chart(subset).mark_bar(opacity=0.85, cornerRadiusTopLeft=2, cornerRadiusTopRight=2).encode(
+            base = alt.Chart(subset).mark_bar(cornerRadiusTopLeft=2, cornerRadiusTopRight=2).encode(
                 x=alt.X(f"{field}:Q", bin=bin_params, title=None, axis=alt.Axis(labelFontSize=9, grid=False)),
                 **encoding
             )
@@ -163,7 +168,7 @@ class DemographicDistributionStrategy(IVisualizationStrategy):
             sort = config.get("sort") or "-y"
             s = "ascending" if sort == "alpha" else "-y" if sort == "count" else None
 
-            base = alt.Chart(subset).mark_bar(opacity=0.85, cornerRadiusTopLeft=2, cornerRadiusTopRight=2).encode(
+            base = alt.Chart(subset).mark_bar(cornerRadiusTopLeft=2, cornerRadiusTopRight=2).encode(
                 x=alt.X(
                     f"{field}:N", 
                     sort=s, 
@@ -173,7 +178,9 @@ class DemographicDistributionStrategy(IVisualizationStrategy):
                 ),
                 **encoding
             )
-
+        
+        if highlight:
+            base = base.add_params(highlight)
         if normalize:
             # Transform to percentages using window transform (safer for concat)
             group_by = [segment_field] if segment_field else []

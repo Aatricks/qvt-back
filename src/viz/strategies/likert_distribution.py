@@ -124,6 +124,8 @@ class LikertDistributionStrategy(IVisualizationStrategy):
 
         color_scale = alt.Scale(domain=[1, 2, 3, 4, 5], range=LIKERT_COLORS)
 
+        highlight = alt.selection_point(on="mouseover", fields=["display_label"], nearest=False)
+
         chart = (
             base.transform_filter(filter_cond)
             .mark_bar()
@@ -131,8 +133,10 @@ class LikertDistributionStrategy(IVisualizationStrategy):
                 y=alt.Y("display_label:N", sort=alt.SortField("sort_value", order="ascending" if focus == "lowest" else "descending"), title=None, axis=alt.Axis(labelLimit=300, labelPadding=12, labelFontSize=10)),
                 x=alt.X("share:Q", stack="normalize", axis=alt.Axis(title="Répartition des réponses", format="%", grid=False)),
                 color=alt.Color("response_value:O", title="Score", sort=[1, 2, 3, 4, 5], scale=color_scale, legend=alt.Legend(title="Échelle de réponse", orient="bottom", direction="horizontal", titleFontSize=10, labelFontSize=9)),
+                opacity=alt.condition(highlight, alt.value(1), alt.value(0.4)),
                 tooltip=[alt.Tooltip("display_label:N", title="Item"), alt.Tooltip("response_value:O", title="Score"), alt.Tooltip("count:Q", title="Effectif", format=".0f"), alt.Tooltip("share:Q", title="Part", format=".1%"), alt.Tooltip("mean:Q", title="Moyenne", format=".2f")],
             )
+            .add_params(highlight)
         )
 
         if facet_field:

@@ -160,6 +160,8 @@ class ActionPriorityIndexStrategy(IVisualizationStrategy):
             "Leviers de prévention de l'épuisement" if outcome == "EPUI" else "Leviers de promotion de l'engagement"
         )
 
+        highlight = alt.selection_point(on="mouseover", fields=["segment"], nearest=False)
+
         chart = (
             alt.Chart(out)
             .mark_bar(cornerRadiusTopRight=4, cornerRadiusBottomRight=4)
@@ -181,6 +183,7 @@ class ActionPriorityIndexStrategy(IVisualizationStrategy):
                     title="Segment",
                     legend=alt.Legend(orient="bottom", titleFontSize=10, labelFontSize=9)
                 ) if out["segment"].nunique() > 1 else alt.value("#4F46E5"),
+                opacity=alt.condition(highlight, alt.value(1), alt.value(0.3)),
                 tooltip=[
                     alt.Tooltip("dimension_label:N", title="Dimension"),
                     alt.Tooltip("mean_score:Q", title="Score moyen", format=".2f"),
@@ -190,6 +193,7 @@ class ActionPriorityIndexStrategy(IVisualizationStrategy):
                     alt.Tooltip("n:Q", title="Effectif"),
                 ],
             )
+            .add_params(highlight)
             .properties(title=alt.TitleParams(text=title, anchor="start", fontSize=14))
             .configure_view(stroke=None)
         )

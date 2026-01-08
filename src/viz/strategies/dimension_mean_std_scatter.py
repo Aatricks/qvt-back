@@ -113,7 +113,9 @@ class DimensionMeanStdScatterStrategy(IVisualizationStrategy):
         base = alt.Chart(agg)
 
         color_encoding = alt.Color("mean_score:Q", title="Score moyen", scale=alt.Scale(scheme=color_scheme))
+        highlight = None
         if segment_field:
+            highlight = alt.selection_point(on="mouseover", fields=[segment_field], nearest=False)
             color_encoding = alt.Color(f"{segment_field}:N", title=segment_field)
 
         tooltip = [
@@ -126,16 +128,18 @@ class DimensionMeanStdScatterStrategy(IVisualizationStrategy):
             tooltip.insert(1, alt.Tooltip(f"{segment_field}:N", title=segment_field))
 
         points = (
-            base.mark_circle(opacity=0.8)
+            base.mark_circle()
             .encode(
                 x=alt.X("mean_score:Q", title="Score moyen (1-5)", scale=alt.Scale(domain=likert_domain)),
                 y=alt.Y("std_dev:Q", title="Écart-type (dispersion)", scale=alt.Scale(zero=True)),
                 size=alt.Size("size:Q", title="Effectif", scale=alt.Scale(range=[50, max_size])),
                 color=color_encoding,
+                opacity=alt.condition(highlight, alt.value(0.9), alt.value(0.2)) if highlight else alt.value(0.8),
                 tooltip=tooltip,
             )
         )
-
+        if highlight:
+            points = points.add_params(highlight)
         layers = [points]
 
         if show_labels:

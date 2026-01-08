@@ -162,20 +162,25 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
         base = alt.Chart(agg)
 
         if segment_field:
+            # Selection for dynamic highlighting on hover
+            highlight = alt.selection_point(on="mouseover", fields=[segment_field], nearest=False)
+
             bars = base.mark_bar(size=12, cornerRadiusTopRight=2, cornerRadiusBottomRight=2).encode(
                 y=y,
                 yOffset=alt.YOffset(f"{segment_field}:N", scale=alt.Scale(padding=0.1)),
                 x=x,
                 x2=alt.datum(lo),
                 color=alt.Color(f"{segment_field}:N", title=segment_field, legend=alt.Legend(orient="bottom")),
+                opacity=alt.condition(highlight, alt.value(1), alt.value(0.3)),
                 tooltip=tooltip,
-            )
+            ).add_params(highlight)
             
             eb = base.mark_errorbar(color="#475569", thickness=1.5).encode(
                 y=y,
                 yOffset=alt.YOffset(f"{segment_field}:N"),
                 x=alt.X("lower:Q"),
                 x2="upper:Q",
+                opacity=alt.condition(highlight, alt.value(1), alt.value(0.3)),
                 tooltip=tooltip,
             )
             

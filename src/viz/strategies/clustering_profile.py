@@ -140,23 +140,27 @@ class ClusteringProfileStrategy(IVisualizationStrategy):
             range=["#4F46E5", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"]
         )
 
+        highlight = alt.selection_point(on="mouseover", fields=["cluster_label"], nearest=False)
+
         # --- CHART 1: Profile Signature (Line) ---
         profile_line = alt.Chart(profile_long).mark_line(
             strokeWidth=3, 
-            interpolate="monotone",
-            opacity=0.85
+            interpolate="monotone"
         ).encode(
             x=alt.X("dimension_label:N", title=None, axis=alt.Axis(labelAngle=-45, labelLimit=150, labelFontSize=10)),
             y=alt.Y("mean_score:Q", title="Score Moyen", scale=alt.Scale(domain=[1, 5]), axis=alt.Axis(grid=True, gridDash=[2,2])),
             color=alt.Color("cluster_label:N", scale=segment_colors, legend=alt.Legend(title="Segments", orient="top-left", offset=10)),
+            opacity=alt.condition(highlight, alt.value(0.9), alt.value(0.2)),
             tooltip=[
                 alt.Tooltip("cluster_label", title="Segment"),
                 alt.Tooltip("dimension_label", title="Dimension"),
                 alt.Tooltip("mean_score:Q", format=".2f", title="Moyenne"),
             ]
-        )
+        ).add_params(highlight)
 
-        profile_points = profile_line.mark_point(size=80, filled=True, opacity=1).encode(opacity=alt.value(1))
+        profile_points = profile_line.mark_point(size=80, filled=True).encode(
+            opacity=alt.condition(highlight, alt.value(1), alt.value(0.2))
+        )
 
         profile_view = (profile_line + profile_points).properties(
             width=550,
@@ -173,8 +177,9 @@ class ClusteringProfileStrategy(IVisualizationStrategy):
             y=alt.Y("cluster_label:N", title=None, axis=alt.Axis(labelFontSize=10)),
             x=alt.X("count:Q", title="Nombre de répondants", axis=alt.Axis(grid=True, gridDash=[2,2])),
             color=alt.Color("cluster_label:N", scale=segment_colors, legend=None),
+            opacity=alt.condition(highlight, alt.value(1), alt.value(0.3)),
             tooltip=[alt.Tooltip("cluster_label", title="Segment"), alt.Tooltip("count:Q", title="Effectif")]
-        ).properties(
+        ).add_params(highlight).properties(
             width=180, 
             height=alt.Step(45), # Tight gaps proportional to bar size
             title=alt.TitleParams(text="Répartition Numérique", fontSize=12, anchor="start", color="#475569")
@@ -190,6 +195,7 @@ class ClusteringProfileStrategy(IVisualizationStrategy):
                 scale=alt.Scale(scheme="tableau20"),
                 legend=alt.Legend(orient="bottom", columns=2, labelFontSize=9, symbolSize=40, padding=10)
             ),
+            opacity=alt.condition(highlight, alt.value(1), alt.value(0.3)),
             tooltip=[
                 alt.Tooltip("cluster_label", title="Segment"),
                 alt.Tooltip("variable", title="Critère"),
@@ -197,8 +203,7 @@ class ClusteringProfileStrategy(IVisualizationStrategy):
                 alt.Tooltip("percentage:Q", format=".1%", title="Proportion"),
                 alt.Tooltip("n:Q", title="Effectif"),
             ]
-        ).properties(width=180, height=alt.Step(30))
-
+        ).add_params(highlight).properties(width=180, height=alt.Step(30))
         facet_demo = demo_bars.facet(
             facet=alt.Facet("variable:N", title=None, header=alt.Header(labelFontSize=11, labelFontWeight="bold", labelColor="#4F46E5")),
             columns=3,
