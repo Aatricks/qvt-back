@@ -136,11 +136,20 @@ class AnovaSignificanceStrategy(IVisualizationStrategy):
         apply_theme()
 
         charts: List[alt.Chart] = []
-        for (d_label, g_var), sub in chart_df.groupby(["dimension_label", "group_variable"], sort=False):
+        # Group by the unique test (dimension + demographic)
+        groups = list(chart_df.groupby(["dimension_label", "group_variable"], sort=False))
+        
+        for i, ((d_label, g_var), sub) in enumerate(groups):
             pv = sub["p_value"].iloc[0]
             title = f"{d_label} ({g_var}, p={pv:.3g})"
 
-            base = alt.Chart(sub, title=alt.TitleParams(text=title, fontSize=12, fontWeight=600)).encode(
+            # Use a unique name for each selection to prevent signal collision
+            highlight = alt.selection_point(name=f"select_{i}", on="mouseover", fields=["group_value"], nearest=False)
+
+            # Explicitly copy the subset to avoid data sharing issues in some Altair versions
+            local_df = sub.copy()
+
+            base = alt.Chart(local_df, title=alt.TitleParams(text=title, fontSize=12, fontWeight=600)).encode(
                 x=alt.X("group_value:N", title=None, axis=alt.Axis(labelAngle=-45, labelLimit=120, labelFontSize=9))
             )
 
@@ -150,28 +159,35 @@ class AnovaSignificanceStrategy(IVisualizationStrategy):
                 range=["#EF4444", "#F59E0B", "#10B981"] # Red, Orange, Green
             )
 
-            bars = base.mark_bar(opacity=0.85, cornerRadiusTopLeft=4, cornerRadiusTopRight=4).encode(
+            bars = base.mark_bar(cornerRadiusTopLeft=4, cornerRadiusTopRight=4).encode(
                 y=alt.Y("mean:Q", title="Score Moyen", scale=alt.Scale(domain=[1, 5]), axis=alt.Axis(grid=True, gridDash=[2,2])),
                 y2=alt.datum(1),
                 color=alt.Color("mean:Q", scale=color_scale, legend=None),
+                opacity=alt.condition(highlight, alt.value(1), alt.value(0.4)),
                 tooltip=[
                     alt.Tooltip("group_value:N", title="Groupe"),
                     alt.Tooltip("mean:Q", title="Moyenne", format=".2f"),
                     alt.Tooltip("lower:Q", title="IC Bas (95%)", format=".2f"),
                     alt.Tooltip("upper:Q", title="IC Haut (95%)", format=".2f"),
                     alt.Tooltip("n:Q", title="Effectif"),
-                    alt.Tooltip("p_value:Q", title="Probabilité (p)", format=".3f"),
+                    alt.Tooltip("p_value:Q", title="Probabilité (p)", format=".3g"),
                 ]
-            )
+            ).add_params(highlight)
 
             error = base.mark_errorbar(color="#475569", thickness=1.5).encode(
                 y=alt.Y("lower:Q", title=""),
-                y2="upper:Q"
+                y2="upper:Q",
+                opacity=alt.condition(highlight, alt.value(1), alt.value(0.4))
             )
 
-            charts.append((bars + error).properties(width=220, height=160))
+            charts.append((bars + error).properties(width=210, height=150))
 
         if not charts:
             raise ValueError("Aucune différence significative exploitable")
 
-        return alt.concat(*charts, columns=columns).resolve_scale(color='independent').configure_view(stroke=None).to_dict()
+        # Concat with independent scales to ensure each chart is distinct
+        return alt.concat(*charts, columns=columns).resolve_scale(
+            x='independent', 
+            y='shared',
+            color='independent'
+        ).configure_view(stroke=None).to_dict()

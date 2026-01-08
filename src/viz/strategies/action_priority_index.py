@@ -160,39 +160,48 @@ class ActionPriorityIndexStrategy(IVisualizationStrategy):
             "Leviers de prévention de l'épuisement" if outcome == "EPUI" else "Leviers de promotion de l'engagement"
         )
 
-        highlight = alt.selection_point(on="mouseover", fields=["segment"], nearest=False)
+        is_segmented = out["segment"].nunique() > 1
+        highlight_field = "segment" if is_segmented else "dimension_label"
+        highlight = alt.selection_point(on="mouseover", fields=[highlight_field], nearest=False)
+
+        y = alt.Y(
+            "dimension_label:N",
+            sort=alt.SortField("priority_index", order="descending"),
+            title=None,
+            axis=alt.Axis(labelLimit=280, labelPadding=12, labelFontSize=10),
+        )
+
+        encoding = {
+            "y": y,
+            "x": alt.X(
+                "priority_index:Q",
+                title="Indice de Priorité (Heuristique)",
+                scale=alt.Scale(zero=True),
+                axis=alt.Axis(grid=True, gridDash=[2,2], titleFontSize=11)
+            ),
+            "color": alt.Color(
+                "segment:N", 
+                title="Segment",
+                legend=alt.Legend(orient="bottom", titleFontSize=10, labelFontSize=9)
+            ) if is_segmented else alt.value("#4F46E5"),
+            "opacity": alt.condition(highlight, alt.value(1), alt.value(0.3)),
+            "tooltip": [
+                alt.Tooltip("dimension_label:N", title="Dimension"),
+                alt.Tooltip("mean_score:Q", title="Score moyen", format=".2f"),
+                alt.Tooltip("gap_to_5:Q", title="Marge d'amélioration", format=".2f"),
+                alt.Tooltip("corr_with_outcome:Q", title=f"Impact sur {outcome}", format=".2f"),
+                alt.Tooltip("priority_index:Q", title="Priorité relative", format=".3f"),
+                alt.Tooltip("n:Q", title="Effectif"),
+            ]
+        }
+
+        if is_segmented:
+            encoding["yOffset"] = alt.YOffset("segment:N")
 
         chart = (
             alt.Chart(out)
             .mark_bar(cornerRadiusTopRight=4, cornerRadiusBottomRight=4)
-            .encode(
-                y=alt.Y(
-                    "dimension_label:N",
-                    sort="-x",
-                    title=None,
-                    axis=alt.Axis(labelLimit=280, labelPadding=12, labelFontSize=10),
-                ),
-                x=alt.X(
-                    "priority_index:Q",
-                    title="Indice de Priorité (Heuristique)",
-                    scale=alt.Scale(zero=True),
-                    axis=alt.Axis(grid=True, gridDash=[2,2], titleFontSize=11)
-                ),
-                color=alt.Color(
-                    "segment:N", 
-                    title="Segment",
-                    legend=alt.Legend(orient="bottom", titleFontSize=10, labelFontSize=9)
-                ) if out["segment"].nunique() > 1 else alt.value("#4F46E5"),
-                opacity=alt.condition(highlight, alt.value(1), alt.value(0.3)),
-                tooltip=[
-                    alt.Tooltip("dimension_label:N", title="Dimension"),
-                    alt.Tooltip("mean_score:Q", title="Score moyen", format=".2f"),
-                    alt.Tooltip("gap_to_5:Q", title="Marge d'amélioration", format=".2f"),
-                    alt.Tooltip("corr_with_outcome:Q", title=f"Impact sur {outcome}", format=".2f"),
-                    alt.Tooltip("priority_index:Q", title="Priorité relative", format=".3f"),
-                    alt.Tooltip("n:Q", title="Effectif"),
-                ],
-            )
+            .encode(**encoding)
             .add_params(highlight)
             .properties(title=alt.TitleParams(text=title, anchor="start", fontSize=14))
             .configure_view(stroke=None)

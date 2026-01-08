@@ -186,6 +186,8 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
             
             chart = (bars + eb).properties(height={"step": 24})
         else:
+            highlight = alt.selection_point(on="mouseover", fields=["dimension_label"], nearest=False)
+
             bars = base.mark_bar(size=16, cornerRadiusTopRight=3, cornerRadiusBottomRight=3).encode(
                 y=y,
                 x=x,
@@ -195,12 +197,14 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
                     scale=alt.Scale(scheme="blues"), # Standard professional scheme
                     legend=None,
                 ),
+                opacity=alt.condition(highlight, alt.value(1), alt.value(0.4)),
                 tooltip=tooltip,
-            )
+            ).add_params(highlight)
             eb = base.mark_errorbar(color="#475569", thickness=1.5).encode(
                 y=y,
                 x=alt.X("lower:Q"),
                 x2="upper:Q",
+                opacity=alt.condition(highlight, alt.value(1), alt.value(0.4)),
                 tooltip=tooltip,
             )
             chart = alt.layer(bars, eb).properties(height={"step": 24})

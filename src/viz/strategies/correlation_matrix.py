@@ -106,10 +106,14 @@ class CorrelationMatrixStrategy(IVisualizationStrategy):
 
         apply_theme()
 
+        highlight = alt.selection_point(on="mouseover", fields=["metric_x", "metric_y"], nearest=False)
+        row_highlight = alt.selection_point(on="mouseover", fields=["metric_y"], nearest=False, name="row_h")
+        col_highlight = alt.selection_point(on="mouseover", fields=["metric_x"], nearest=False, name="col_h")
+
         base = alt.Chart(corr_reset).encode(
             x=alt.X("metric_x:N", sort=ordered_labels, title=None),
             y=alt.Y("metric_y:N", sort=ordered_labels, title=None)
-        )
+        ).add_params(highlight, row_highlight, col_highlight)
 
         heatmap = base.mark_rect().encode(
             color=alt.Color(
@@ -117,6 +121,13 @@ class CorrelationMatrixStrategy(IVisualizationStrategy):
                 scale=alt.Scale(scheme="blueorange", domain=[-1, 1]),
                 legend=alt.Legend(title="Corrélation")
             ),
+            opacity=alt.condition(
+                row_highlight | col_highlight,
+                alt.value(1),
+                alt.value(0.6)
+            ),
+            stroke=alt.condition(highlight, alt.value("black"), alt.value(None)),
+            strokeWidth=alt.value(2),
             tooltip=["metric_x", "metric_y", alt.Tooltip("correlation:Q", format=".2f")]
         )
 
@@ -126,7 +137,8 @@ class CorrelationMatrixStrategy(IVisualizationStrategy):
                 "abs(datum.correlation) > 0.5",
                 alt.value("white"),
                 alt.value("black")
-            )
+            ),
+            opacity=alt.condition(row_highlight | col_highlight, alt.value(1), alt.value(0.2))
         )
 
         chart = (heatmap + text).properties(

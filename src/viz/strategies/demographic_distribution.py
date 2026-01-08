@@ -139,6 +139,8 @@ class DemographicDistributionStrategy(IVisualizationStrategy):
         if segment_field:
             highlight = alt.selection_point(on="mouseover", fields=[segment_field], nearest=False)
             color = alt.Color(f"{segment_field}:N", title=None, legend=alt.Legend(orient="bottom", titleFontSize=10, labelFontSize=9))
+        else:
+            highlight = alt.selection_point(on="mouseover", fields=[field], nearest=False)
 
         tooltip = [alt.Tooltip(field, title="Catégorie"), alt.Tooltip("count()", title="Effectif")]
         if segment_field: 
@@ -146,12 +148,10 @@ class DemographicDistributionStrategy(IVisualizationStrategy):
 
         encoding = {
             "color": color,
-            "tooltip": tooltip
+            "tooltip": tooltip,
+            "opacity": alt.condition(highlight, alt.value(1), alt.value(0.4))
         }
         
-        if highlight:
-            encoding["opacity"] = alt.condition(highlight, alt.value(1), alt.value(0.3))
-
         # Grouped bars (xOffset) if comparison is active
         if segment_field:
             encoding["xOffset"] = alt.XOffset(f"{segment_field}:N", scale=alt.Scale(paddingInner=0.1))
@@ -179,8 +179,7 @@ class DemographicDistributionStrategy(IVisualizationStrategy):
                 **encoding
             )
         
-        if highlight:
-            base = base.add_params(highlight)
+        base = base.add_params(highlight)
         if normalize:
             # Transform to percentages using window transform (safer for concat)
             group_by = [segment_field] if segment_field else []

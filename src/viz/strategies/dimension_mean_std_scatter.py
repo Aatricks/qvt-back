@@ -117,6 +117,8 @@ class DimensionMeanStdScatterStrategy(IVisualizationStrategy):
         if segment_field:
             highlight = alt.selection_point(on="mouseover", fields=[segment_field], nearest=False)
             color_encoding = alt.Color(f"{segment_field}:N", title=segment_field)
+        else:
+            highlight = alt.selection_point(on="mouseover", fields=["dimension_label"], nearest=False)
 
         tooltip = [
             "dimension_label",
@@ -134,12 +136,11 @@ class DimensionMeanStdScatterStrategy(IVisualizationStrategy):
                 y=alt.Y("std_dev:Q", title="Écart-type (dispersion)", scale=alt.Scale(zero=True)),
                 size=alt.Size("size:Q", title="Effectif", scale=alt.Scale(range=[50, max_size])),
                 color=color_encoding,
-                opacity=alt.condition(highlight, alt.value(0.9), alt.value(0.2)) if highlight else alt.value(0.8),
+                opacity=alt.condition(highlight, alt.value(0.9), alt.value(0.2)),
                 tooltip=tooltip,
             )
         )
-        if highlight:
-            points = points.add_params(highlight)
+        points = points.add_params(highlight)
         layers = [points]
 
         if show_labels:
