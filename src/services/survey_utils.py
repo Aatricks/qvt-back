@@ -22,8 +22,8 @@ SOCIO_COLUMNS: List[str] = [
 LIKERT_PREFIX_LABELS: Dict[str, str] = {
     "POV": "Pratiques organisationnelles vertueuses",
     "PGC": "Pratiques de gestion de carrière",
-    "CSA": "Pratiques de santé et de sécurité",
-    "CSE": "Pratiques de santé et de sécurité",
+    "CSA": "Pratiques de santé et sécurité (physique)",
+    "CSE": "Pratiques de santé et sécurité (psychosociale)",
     "EVPVP": "Pratiques de conciliation entre la vie privée et la vie personnelle",
     "RECO": "Pratiques de reconnaissance",
     "COM": "Pratiques de communication",

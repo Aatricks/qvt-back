@@ -80,12 +80,16 @@ def test_dimension_ci_bars_axis_and_height():
 
     axis = enc["y"].get("axis") if isinstance(enc.get("y"), dict) else None
     assert axis is not None, "dimension_ci_bars: 'y' encoding must contain an 'axis' object"
-    assert axis.get("labelLimit") == 150, "dimension_ci_bars: expected y axis labelLimit == 150"
+    assert axis.get("labelLimit") == 260, "dimension_ci_bars: expected y axis labelLimit == 260"
     assert axis.get("labelPadding") == 8, "dimension_ci_bars: expected y axis labelPadding == 8"
     # Bars should be anchored to the left domain bound via x2=1 (default Likert lower bound)
     x2 = enc.get("x2")
     assert x2 is not None, "dimension_ci_bars: expected 'x2' anchor to be present"
     assert x2.get("datum") in (1, 1.0), "dimension_ci_bars: expected 'x2' anchor datum to be 1"
     
-    # Padding is now managed by Vega-Lite auto-layout or minimal
-    assert _has_height_step(spec, step=18), "dimension_ci_bars: expected chart height to include {'step': 18}"
+    # Ensure left padding has been set
+    left_pad = _find_left_padding(spec)
+    assert left_pad is not None and float(left_pad) >= 120
+    
+    # Ensure standard height step
+    assert _has_height_step(spec, step=22), "dimension_ci_bars: expected chart height to include {'step': 22}"

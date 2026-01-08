@@ -141,7 +141,7 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
             "dimension_label:N",
             title="Dimension QVCT",
             sort=alt.SortField(field="overall_mean", order="descending"),
-            axis=alt.Axis(labelLimit=150, labelPadding=8),
+            axis=alt.Axis(labelLimit=260, labelPadding=8),
         )
 
         tooltip = [
@@ -180,7 +180,7 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
                 tooltip=tooltip,
             )
             
-            chart = (bars + eb).properties(height={"step": 18}) # Very compact rows
+            chart = (bars + eb).properties(height={"step": 22}) # Very compact rows
         else:
             bars = base.mark_bar(size=14).encode(
                 y=y,
@@ -199,18 +199,20 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
                 x2="upper:Q",
                 tooltip=tooltip,
             )
-            chart = alt.layer(bars, eb).properties(height={"step": 18})
+            chart = alt.layer(bars, eb).properties(height={"step": 22})
 
         if facet_field:
             chart = chart.facet(
                 column=alt.Column(f"{facet_field}:N", title=facet_field)
             ).properties(
-                title=f"Scores par dimension (moyenne et écart-type) par {facet_field}"
+                title=f"Scores par dimension (moyenne et écart-type) par {facet_field}",
+                padding={"left": 120}
             )
         else:
             chart = chart.properties(
                 title="Scores par dimension (moyenne et écart-type)",
                 width=350, # Reduced width to fit 2-col grid
+                padding={"left": 120}
             )
 
         return chart.interactive().to_dict()
