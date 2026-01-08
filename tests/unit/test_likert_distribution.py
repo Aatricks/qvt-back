@@ -51,6 +51,39 @@ def test_likert_distribution_structure():
     
     assert filter_present, "Filter referencing 'dim_select' should be at the top level"
 
+def test_likert_distribution_faceted_structure():
+    # Mock data
+    data = [
+        {"dimension_prefix": "A", "question_label": "Q1", "response_value": 1, "group": "G1"},
+        {"dimension_prefix": "B", "question_label": "Q2", "response_value": 5, "group": "G2"},
+    ]
+    df = pd.DataFrame(data)
+    
+    strategy = LikertDistributionStrategy()
+    
+    # Generate spec with facet
+    spec = strategy.generate(
+        data={"survey": df},
+        config={"interactive_dimension": True, "facet_field": "group"},
+        filters={},
+        settings={}
+    )
+    
+    assert "facet" in spec
+    assert "spec" in spec
+    assert "transform" in spec["spec"], "Transform should be inside the faceted spec"
+    
+    # Check for the filter
+    filter_present = False
+    for t in spec["spec"]["transform"]:
+        if "filter" in t:
+            f = t["filter"]
+            if "dim_select" in str(f):
+                filter_present = True
+                break
+    
+    assert filter_present, "Filter referencing 'dim_select' should be inside the faceted spec"
+
 def test_likert_distribution_scoping():
     # Test ensuring that the signal usage is correct
     # This is implicitly checked by the structure above.

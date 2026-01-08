@@ -56,9 +56,14 @@ class LikertDistributionStrategy(IVisualizationStrategy):
             if col in df.columns:
                 df[col] = df[col].map(mapping).fillna(df[col])
 
+        # Robust filtering in Pandas
         for key, value in (filters or {}).items():
             if key in df.columns:
-                df = df[df[key] == value]
+                if isinstance(value, list):
+                    if len(value) > 0:
+                        df = df[df[key].isin(value)]
+                elif value is not None and value != "All":
+                    df = df[df[key] == value]
 
         if df.empty:
             raise ValueError("Dataset vide après filtrage pour la distribution Likert")
@@ -188,8 +193,21 @@ class LikertDistributionStrategy(IVisualizationStrategy):
         # Ensure constant field exists for faceting (avoid transform_calculate inside facet)
         base = alt.Chart(plot_df)
         
-        # NOTE: Filter is applied at the TOP LEVEL (final_chart) to ensure 'dim_select' visibility.
-        # We use integer check for is_category (1=True, 0=False) for robustness.
+        # --- Define Filters ---
+        # Default view is categories if no dimension selected
+        filter_cond = (alt.datum.is_category == 1)
+        
+        if dim_param is not None:
+            filter_cond = (
+                ((dim_param == "All") & (alt.datum.is_category == 1)) |
+                ((dim_param != "All") & (alt.datum.dimension_prefix == dim_param) & (alt.datum.is_category == 0))
+            )
+        
+        if seg_param is not None and segment_field is not None:
+            filter_cond = filter_cond & ((seg_param == "All") | (alt.datum[segment_field] == seg_param))
+
+        # IMPORTANT: Remove ghost lines (labels with no data in current view)
+        filter_cond = filter_cond & (alt.datum.total > 0)
 
         color_scale = alt.Scale(
             domain=[1, 2, 3, 4, 5],
@@ -197,7 +215,8 @@ class LikertDistributionStrategy(IVisualizationStrategy):
         )
 
         chart = (
-            base.mark_bar()
+            base.transform_filter(filter_cond)
+            .mark_bar()
             .encode(
                 y=alt.Y(
                     "display_label:N",
@@ -244,26 +263,8 @@ class LikertDistributionStrategy(IVisualizationStrategy):
                 title=f"Distribution Likert par {facet_field}"
             )
         else:
-            # Flattened view: No dummy facet. 
-            # This ensures params and filters are in the same scope, preventing "Unrecognized signal" errors
-            # and ensuring the Y-axis domain updates correctly (avoiding "ghost titles").
             final_chart = chart.properties(
                 title="Distribution des réponses (Likert)"
-            )
-
-        # Apply filters to the TOP-LEVEL chart
-        if dim_param is not None:
-            final_chart = final_chart.transform_filter(
-                ((dim_param == "All") & (alt.datum.is_category == 1)) |
-                ((dim_param != "All") & (alt.datum.dimension_prefix == dim_param) & (alt.datum.is_category == 0))
-            )
-        else:
-            # Fallback
-            final_chart = final_chart.transform_filter(alt.datum.is_category == 1)
-
-        if seg_param is not None and segment_field is not None:
-            final_chart = final_chart.transform_filter(
-                (seg_param == "All") | (alt.datum[segment_field] == seg_param)
             )
 
         # IMPORTANT: Interactive params must be added to the TOP-LEVEL chart
