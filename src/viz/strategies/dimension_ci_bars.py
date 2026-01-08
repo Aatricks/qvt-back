@@ -166,6 +166,7 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
                 y=y,
                 yOffset=alt.YOffset(f"{segment_field}:N", scale=alt.Scale(padding=0.1)),
                 x=x,
+                x2=alt.datum(lo),
                 color=alt.Color(f"{segment_field}:N", title=segment_field, legend=alt.Legend(orient="bottom")),
                 tooltip=tooltip,
             )

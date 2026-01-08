@@ -56,20 +56,28 @@ def apply_theme() -> None:
                 },
                 "range": {
                     "category": [
-                        "#4F46E5", # indigo-600
-                        "#0EA5E9", # sky-500
+                        "#4F46E5", # indigo-600 (Primary)
                         "#10B981", # emerald-500
                         "#F59E0B", # amber-500
                         "#EF4444", # red-500
                         "#8B5CF6", # violet-500
                         "#EC4899", # pink-500
+                        "#0EA5E9", # sky-500
+                    ],
+                    "comparison": [
+                        "#1E293B", # slate-800 (Organization/Global)
+                        "#4F46E5", # indigo-600
+                        "#0EA5E9", # sky-500
+                        "#10B981", # emerald-500
+                        "#F59E0B", # amber-500
+                        "#8B5CF6", # violet-500
                     ],
                     "diverging": [
-                        "#B91C1C", # red-700
+                        "#DC2626", # red-600
                         "#FCA5A5", # red-300
-                        "#E2E8F0", # slate-200
+                        "#F1F5F9", # slate-100 (Neutral)
                         "#93C5FD", # blue-300
-                        "#1D4ED8", # blue-700
+                        "#2563EB", # blue-600
                     ],
                     "heatmap": ["#F1F5F9", "#4F46E5"]
                 },
@@ -89,5 +97,6 @@ def apply_theme() -> None:
     alt.data_transformers.disable_max_rows()
 
 # Helper constants for strategies
-LIKERT_COLORS = ["#B91C1C", "#FCA5A5", "#E2E8F0", "#93C5FD", "#1D4ED8"]
+LIKERT_COLORS = ["#DC2626", "#FCA5A5", "#F1F5F9", "#93C5FD", "#2563EB"]
+COMPARISON_COLORS = ["#1E293B", "#4F46E5", "#0EA5E9", "#10B981", "#F59E0B", "#8B5CF6"]
 BASE_ENCODING = {"color": alt.value("#4F46E5"), "opacity": alt.value(0.85)}
