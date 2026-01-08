@@ -136,44 +136,42 @@ class AnovaSignificanceStrategy(IVisualizationStrategy):
         apply_theme()
 
         charts: List[alt.Chart] = []
-        # Group by both dimension AND the demographic variable to prevent mixing categories
         for (d_label, g_var), sub in chart_df.groupby(["dimension_label", "group_variable"], sort=False):
             pv = sub["p_value"].iloc[0]
-            title = f"{d_label} (selon {g_var}, p={pv:.3g})"
+            title = f"{d_label} ({g_var}, p={pv:.3g})"
 
-            base = alt.Chart(sub, title=title).encode(
-                x=alt.X("group_value:N", title=None, axis=alt.Axis(labelAngle=-45, labelLimit=100))
+            base = alt.Chart(sub, title=alt.TitleParams(text=title, fontSize=12, fontWeight=600)).encode(
+                x=alt.X("group_value:N", title=None, axis=alt.Axis(labelAngle=-45, labelLimit=120, labelFontSize=9))
             )
 
-            # Semantic coloring using a threshold scale
+            # Professional semantic coloring
             color_scale = alt.Scale(
                 domain=[2.5, 3.5],
                 range=["#EF4444", "#F59E0B", "#10B981"] # Red, Orange, Green
             )
 
-            bars = base.mark_bar(opacity=0.8).encode(
-                y=alt.Y("mean:Q", title="Moyenne (1-5)", scale=alt.Scale(domain=[1, 5])),
+            bars = base.mark_bar(opacity=0.85, cornerRadiusTopLeft=4, cornerRadiusTopRight=4).encode(
+                y=alt.Y("mean:Q", title="Score Moyen", scale=alt.Scale(domain=[1, 5]), axis=alt.Axis(grid=True, gridDash=[2,2])),
                 y2=alt.datum(1),
                 color=alt.Color("mean:Q", scale=color_scale, legend=None),
                 tooltip=[
                     alt.Tooltip("group_value:N", title="Groupe"),
                     alt.Tooltip("mean:Q", title="Moyenne", format=".2f"),
-                    alt.Tooltip("lower:Q", title="CI Bas", format=".2f"),
-                    alt.Tooltip("upper:Q", title="CI Haut", format=".2f"),
-                    alt.Tooltip("n:Q", title="N"),
-                    alt.Tooltip("p_value:Q", title="ANOVA p", format=".3f"),
-                    alt.Tooltip("eta_sq:Q", title="Effet (η²)", format=".2f"),
+                    alt.Tooltip("lower:Q", title="IC Bas (95%)", format=".2f"),
+                    alt.Tooltip("upper:Q", title="IC Haut (95%)", format=".2f"),
+                    alt.Tooltip("n:Q", title="Effectif"),
+                    alt.Tooltip("p_value:Q", title="Probabilité (p)", format=".3f"),
                 ]
             )
 
-            error = base.mark_errorbar().encode(
+            error = base.mark_errorbar(color="#475569", thickness=1.5).encode(
                 y=alt.Y("lower:Q", title=""),
                 y2="upper:Q"
             )
 
-            charts.append((bars + error).properties(width=250, height=180))
+            charts.append((bars + error).properties(width=220, height=160))
 
         if not charts:
-            raise ValueError("No visualizable significant differences")
+            raise ValueError("Aucune différence significative exploitable")
 
-        return alt.concat(*charts, columns=columns).resolve_scale(color='independent').to_dict()
+        return alt.concat(*charts, columns=columns).resolve_scale(color='independent').configure_view(stroke=None).to_dict()

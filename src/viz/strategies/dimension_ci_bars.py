@@ -134,14 +134,15 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
 
         x = alt.X(
             "mean_score:Q",
-            title="Score moyen (1-5)",
+            title="Score Moyen (1-5)",
             scale=alt.Scale(domain=[lo, hi]),
+            axis=alt.Axis(grid=True, gridDash=[2,2], titleFontSize=11)
         )
         y = alt.Y(
             "dimension_label:N",
-            title="Dimension QVCT",
+            title=None,
             sort=alt.SortField(field="overall_mean", order="descending"),
-            axis=alt.Axis(labelLimit=260, labelPadding=8),
+            axis=alt.Axis(labelLimit=280, labelPadding=12, labelFontSize=10),
         )
 
         tooltip = [
@@ -150,69 +151,63 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
             alt.Tooltip("std_score:Q", title="Écart-type", format=".2f"),
             alt.Tooltip("lower:Q", title="Moyenne - 1 SD", format=".2f"),
             alt.Tooltip("upper:Q", title="Moyenne + 1 SD", format=".2f"),
-            alt.Tooltip("n:Q", title="Répondants"),
+            alt.Tooltip("n:Q", title="Effectif"),
         ]
 
         if segment_field:
-            tooltip.insert(1, alt.Tooltip(f"{segment_field}:N", title=segment_field))
+            tooltip.insert(1, alt.Tooltip(f"{segment_field}:N", title="Segment"))
         if facet_field:
-            tooltip.insert(1, alt.Tooltip(f"{facet_field}:N", title=facet_field))
+            tooltip.insert(1, alt.Tooltip(f"{facet_field}:N", title="Facette"))
 
         base = alt.Chart(agg)
 
-        # Use Grouped Bars when segment_field is present
         if segment_field:
-            # Grouped bar chart: offset Y by segment
-            bars = base.mark_bar(size=10).encode( # Thinner bars
+            bars = base.mark_bar(size=12, cornerRadiusTopRight=2, cornerRadiusBottomRight=2).encode(
                 y=y,
-                yOffset=alt.YOffset(f"{segment_field}:N", scale=alt.Scale(padding=0)), # Remove inner padding
+                yOffset=alt.YOffset(f"{segment_field}:N", scale=alt.Scale(padding=0.1)),
                 x=x,
-                color=alt.Color(f"{segment_field}:N", title=segment_field),
+                color=alt.Color(f"{segment_field}:N", title=segment_field, legend=alt.Legend(orient="bottom")),
                 tooltip=tooltip,
             )
             
-            eb = base.mark_errorbar().encode(
+            eb = base.mark_errorbar(color="#475569", thickness=1.5).encode(
                 y=y,
-                yOffset=alt.YOffset(f"{segment_field}:N", scale=alt.Scale(padding=0)),
-                x=alt.X("lower:Q", scale=alt.Scale(domain=[lo, hi])),
+                yOffset=alt.YOffset(f"{segment_field}:N"),
+                x=alt.X("lower:Q"),
                 x2="upper:Q",
-                color=alt.value("black"), # Better contrast on colored bars
                 tooltip=tooltip,
             )
             
-            chart = (bars + eb).properties(height={"step": 22}) # Very compact rows
+            chart = (bars + eb).properties(height={"step": 24})
         else:
-            bars = base.mark_bar(size=14).encode(
+            bars = base.mark_bar(size=16, cornerRadiusTopRight=3, cornerRadiusBottomRight=3).encode(
                 y=y,
                 x=x,
                 x2=alt.datum(lo),
                 color=alt.Color(
                     "mean_score:Q",
-                    scale=alt.Scale(scheme="blues"),
+                    scale=alt.Scale(scheme="blues"), # Standard professional scheme
                     legend=None,
                 ),
                 tooltip=tooltip,
             )
-            eb = base.mark_errorbar().encode(
+            eb = base.mark_errorbar(color="#475569", thickness=1.5).encode(
                 y=y,
-                x=alt.X("lower:Q", scale=alt.Scale(domain=[lo, hi])),
+                x=alt.X("lower:Q"),
                 x2="upper:Q",
                 tooltip=tooltip,
             )
-            chart = alt.layer(bars, eb).properties(height={"step": 22})
+            chart = alt.layer(bars, eb).properties(height={"step": 24})
 
         if facet_field:
             chart = chart.facet(
-                column=alt.Column(f"{facet_field}:N", title=facet_field)
+                column=alt.Column(f"{facet_field}:N", title=None)
             ).properties(
-                title=f"Scores par dimension (moyenne et écart-type) par {facet_field}",
-                padding={"left": 120}
+                title=alt.TitleParams(text="Scores par dimension et segment", anchor="start", fontSize=14)
             )
         else:
             chart = chart.properties(
-                title="Scores par dimension (moyenne et écart-type)",
-                width=350, # Reduced width to fit 2-col grid
-                padding={"left": 120}
+                title=alt.TitleParams(text="Scores par dimension (moyenne et dispersion)", anchor="start", fontSize=14),
             )
 
-        return chart.interactive().to_dict()
+        return chart.configure_view(stroke=None).to_dict()

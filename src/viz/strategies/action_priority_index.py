@@ -157,39 +157,41 @@ class ActionPriorityIndexStrategy(IVisualizationStrategy):
         apply_theme()
 
         title = (
-            "Priorités d'action (POV) vs Épuisement" if outcome == "EPUI" else "Priorités d'action (POV) vs Engagement"
+            "Leviers de prévention de l'épuisement" if outcome == "EPUI" else "Leviers de promotion de l'engagement"
         )
 
         chart = (
             alt.Chart(out)
-            .mark_bar()
+            .mark_bar(cornerRadiusTopRight=4, cornerRadiusBottomRight=4)
             .encode(
                 y=alt.Y(
                     "dimension_label:N",
                     sort="-x",
-                    title="Dimension QVT",
-                    axis=alt.Axis(labelLimit=260, labelPadding=8),
+                    title=None,
+                    axis=alt.Axis(labelLimit=280, labelPadding=12, labelFontSize=10),
                 ),
                 x=alt.X(
                     "priority_index:Q",
-                    title="Indice de priorité (heuristique)",
-                    scale=alt.Scale(zero=False),
+                    title="Indice de Priorité (Heuristique)",
+                    scale=alt.Scale(zero=True),
+                    axis=alt.Axis(grid=True, gridDash=[2,2], titleFontSize=11)
                 ),
-                x2=alt.value(0),
-                color=alt.Color("segment:N", title=segment_field) if out["segment"].nunique() > 1 else alt.value("#2563EB"),
+                color=alt.Color(
+                    "segment:N", 
+                    title="Segment",
+                    legend=alt.Legend(orient="bottom", titleFontSize=10, labelFontSize=9)
+                ) if out["segment"].nunique() > 1 else alt.value("#4F46E5"),
                 tooltip=[
                     alt.Tooltip("dimension_label:N", title="Dimension"),
                     alt.Tooltip("mean_score:Q", title="Score moyen", format=".2f"),
-                    alt.Tooltip("gap_to_5:Q", title="Écart à 5", format=".2f"),
-                    alt.Tooltip("corr_with_outcome:Q", title=f"Corr. avec {outcome}", format=".2f"),
-                    alt.Tooltip("leverage:Q", title="Levier (0-1)", format=".2f"),
-                    alt.Tooltip("priority_index:Q", title="Indice", format=".3f"),
-                    alt.Tooltip("n:Q", title="N"),
-                    alt.Tooltip("segment:N", title=segment_field),
+                    alt.Tooltip("gap_to_5:Q", title="Marge d'amélioration", format=".2f"),
+                    alt.Tooltip("corr_with_outcome:Q", title=f"Impact sur {outcome}", format=".2f"),
+                    alt.Tooltip("priority_index:Q", title="Priorité relative", format=".3f"),
+                    alt.Tooltip("n:Q", title="Effectif"),
                 ],
             )
-            .properties(title=title, height={"step": 22}, padding={"left": 120})
-            .interactive()
+            .properties(title=alt.TitleParams(text=title, anchor="start", fontSize=14))
+            .configure_view(stroke=None)
         )
 
         return chart.to_dict()

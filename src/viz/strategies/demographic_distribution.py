@@ -97,11 +97,11 @@ class DemographicDistributionStrategy(IVisualizationStrategy):
             # Arrange in 2 or 3 columns
             cols = 3 if len(charts) > 3 else 2
             final = alt.concat(*charts, columns=cols).properties(
-                title="Aperçu de la composition de l'effectif"
-            )
+                title=alt.TitleParams(text="Aperçu de la composition de l'effectif", anchor="start", fontSize=16, fontWeight=700)
+            ).configure_view(stroke=None)
             
             if facet_field:
-                final = final.facet(column=alt.Column(f"{facet_field}:N", title=facet_field))
+                final = final.facet(column=alt.Column(f"{facet_field}:N", title=None))
 
             return final.to_dict()
 
@@ -112,9 +112,9 @@ class DemographicDistributionStrategy(IVisualizationStrategy):
         chart = self._make_single_chart(hr_df, field, config)
         
         if facet_field:
-            chart = chart.facet(column=alt.Column(f"{facet_field}:N", title=facet_field))
+            chart = chart.facet(column=alt.Column(f"{facet_field}:N", title=None))
 
-        return chart.interactive().to_dict()
+        return chart.configure_view(stroke=None).to_dict()
 
     def _make_single_chart(self, df: pd.DataFrame, field: str, config: Dict[str, Any]) -> alt.Chart:
         """Internal helper to create a single bar chart or histogram."""
@@ -134,12 +134,13 @@ class DemographicDistributionStrategy(IVisualizationStrategy):
         if subset.empty:
             return alt.Chart().mark_text().properties(title=f"{field} (no data)")
 
-        color = alt.value("#2563EB")
+        color = alt.value("#4F46E5")
         if segment_field:
-            color = alt.Color(f"{segment_field}:N", title=segment_field)
+            color = alt.Color(f"{segment_field}:N", title=None, legend=alt.Legend(orient="bottom", titleFontSize=10, labelFontSize=9))
 
-        tooltip = [field, "count()"]
-        if segment_field: tooltip.insert(0, segment_field)
+        tooltip = [alt.Tooltip(field, title="Catégorie"), alt.Tooltip("count()", title="Effectif")]
+        if segment_field: 
+            tooltip.insert(0, alt.Tooltip(segment_field, title="Segment"))
 
         encoding = {
             "color": color,
@@ -148,31 +149,26 @@ class DemographicDistributionStrategy(IVisualizationStrategy):
         
         # Grouped bars (xOffset) if comparison is active
         if segment_field:
-            encoding["xOffset"] = alt.XOffset(f"{segment_field}:N", scale=alt.Scale(paddingInner=0.05))
+            encoding["xOffset"] = alt.XOffset(f"{segment_field}:N", scale=alt.Scale(paddingInner=0.1))
 
         if is_numeric:
             bin_size = config.get("bin_size")
             bin_params = {"step": bin_size} if bin_size else {"maxbins": 10}
             
-            base = alt.Chart(subset).mark_bar(opacity=0.8).encode(
-                x=alt.X(f"{field}:Q", bin=bin_params, title=field, scale=alt.Scale(paddingInner=0.1)),
+            base = alt.Chart(subset).mark_bar(opacity=0.85, cornerRadiusTopLeft=2, cornerRadiusTopRight=2).encode(
+                x=alt.X(f"{field}:Q", bin=bin_params, title=None, axis=alt.Axis(labelFontSize=9, grid=False)),
                 **encoding
             )
         else:
-            sort = config.get("sort")
-            if sort == "alpha":
-                s = "ascending"
-            elif sort == "count":
-                s = "-y"
-            else:
-                s = None
+            sort = config.get("sort") or "-y"
+            s = "ascending" if sort == "alpha" else "-y" if sort == "count" else None
 
-            base = alt.Chart(subset).mark_bar(opacity=0.8).encode(
+            base = alt.Chart(subset).mark_bar(opacity=0.85, cornerRadiusTopLeft=2, cornerRadiusTopRight=2).encode(
                 x=alt.X(
                     f"{field}:N", 
                     sort=s, 
                     title=None, 
-                    axis=alt.Axis(labelAngle=-45, labelLimit=100),
+                    axis=alt.Axis(labelAngle=-45, labelLimit=100, labelFontSize=9),
                     scale=alt.Scale(paddingInner=0.2)
                 ),
                 **encoding
@@ -189,7 +185,7 @@ class DemographicDistributionStrategy(IVisualizationStrategy):
                 ).transform_calculate(
                     pct="datum.count / datum.total"
                 ).encode(
-                    y=alt.Y("pct:Q", title=None, axis=alt.Axis(format="%"))
+                    y=alt.Y("pct:Q", title=None, axis=alt.Axis(format="%", grid=True, gridDash=[2,2], labelFontSize=9))
                 )
             else:
                 chart = base.transform_window(
@@ -199,13 +195,11 @@ class DemographicDistributionStrategy(IVisualizationStrategy):
                 ).transform_calculate(
                     pct="1 / datum.total"
                 ).encode(
-                    y=alt.Y("sum(pct):Q", title=None, axis=alt.Axis(format="%"))
+                    y=alt.Y("sum(pct):Q", title=None, axis=alt.Axis(format="%", grid=True, gridDash=[2,2], labelFontSize=9))
                 )
         else:
-            chart = base.encode(y=alt.Y("count()", title=None))
+            chart = base.encode(y=alt.Y("count()", title=None, axis=alt.Axis(grid=True, gridDash=[2,2], labelFontSize=9)))
 
-        # Dynamic width to prevent overlap in grouped bars, but conservative to keep it compact
-        n_segments = subset[segment_field].nunique() if segment_field else 1
-        step_width = max(12, n_segments * 8)
-
-        return chart.properties(width={"step": step_width}, height=150, title=field)
+        # Adjust dimensions for composite layout
+        step_width = 30 if segment_field else 40
+        return chart.properties(width={"step": step_width}, height=120, title=alt.TitleParams(text=field, fontSize=11, fontWeight=600, color="#475569"))
