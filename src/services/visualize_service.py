@@ -4,7 +4,7 @@ from typing import Any, Dict, Optional
 import pandas as pd
 from fastapi import UploadFile
 
-import src.viz  # noqa: F401 ensures default strategies registered
+
 from src.config.observability import log_error, log_event, timed
 from src.config.settings import settings
 from src.schemas.datasets import HR_REQUIRED_COLUMNS, SURVEY_REQUIRED_COLUMNS
@@ -133,31 +133,31 @@ async def generate_chart(
     # 0. Pre-process filters: if a filter has an empty value, treat it as a request for comparison
     filters = request.filters or {}
     config = request.config or {}
-    
+
     clean_filters = {}
     comparison_candidates = []
-    
+
     for k, v in filters.items():
         # Treat None, empty string, or literal "null" as unspecified
         if v is None or str(v).strip() == "" or str(v).lower() == "null":
             comparison_candidates.append(k)
         else:
             clean_filters[k] = v
-            
+
     # Auto-assign empty filters to comparison slots if not already explicitly set in config
     if comparison_candidates:
         config = config.copy()
         if not config.get("segment_field"):
             config["segment_field"] = comparison_candidates.pop(0)
-        
+
         if comparison_candidates and not config.get("facet_field"):
             config["facet_field"] = comparison_candidates.pop(0)
 
     # 1. Cache lookup before validation/filtering (fast path)
     cache_key = _get_cache_key(
-        request.chart_key, 
-        {"hr": hr_df, "survey": survey_df}, 
-        config, 
+        request.chart_key,
+        {"hr": hr_df, "survey": survey_df},
+        config,
         clean_filters
     )
     if cache_key in _SPEC_CACHE:
@@ -230,7 +230,7 @@ def _get_cache_key(chart_key: str, data: Dict[str, pd.DataFrame], config: Dict, 
     """Create a stable hashable key for request caching."""
     # Using shape and column tuple as a proxy for dataset identity
     data_id = tuple(
-        (k, df.shape, tuple(df.columns)) 
+        (k, df.shape, tuple(df.columns))
         for k, df in data.items() if df is not None
     )
     # Convert dicts to sorted tuples for hashing
@@ -243,18 +243,14 @@ def _apply_filters(df: pd.DataFrame, filters: Dict[str, Any]) -> pd.DataFrame:
     """Filter dataframe robustly, comparing values as strings."""
     if not filters or df.empty:
         return df
-    
-    # We don't copy immediately; pandas slicing returns a new object usually, 
-    # but let's be safe if we modify it. 
-    # Actually, we are just subsetting, so no deep copy needed unless we mutate.
-    
+
     for key, value in filters.items():
         if key not in df.columns:
             continue
-        
+
         # Cast column to string and strip whitespace for robust comparison against frontend string values
         # Note: this might be expensive for very large DFs, but ensures correctness.
         mask = df[key].astype(str).str.strip() == str(value).strip()
         df = df[mask]
-        
+
     return df
