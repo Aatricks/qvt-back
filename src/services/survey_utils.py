@@ -112,7 +112,7 @@ def to_likert_long(
         for col in extra_id_vars:
             if col in df.columns and col not in id_vars:
                 id_vars.append(col)
-    
+
     melted = df.melt(
         id_vars=id_vars,
         value_vars=likert_cols,
@@ -138,11 +138,10 @@ def add_age_band(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def add_seniority_band(df: pd.DataFrame) -> pd.DataFrame:
-    # "Ancienneté" might have been renamed from "Ancienne" already
     target = "Ancienneté" if "Ancienneté" in df.columns else "Ancienne"
     if target not in df.columns:
         return df
-    
+
     result = df.copy()
     result[target] = pd.to_numeric(result[target], errors="coerce")
     result["AnciennetéClasse"] = pd.cut(
