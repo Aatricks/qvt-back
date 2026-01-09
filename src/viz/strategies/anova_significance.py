@@ -144,7 +144,9 @@ class AnovaSignificanceStrategy(IVisualizationStrategy):
             title = f"{d_label} ({g_var}, p={pv:.3g})"
 
             # Use a unique name for each selection to prevent signal collision
-            highlight = alt.selection_point(name=f"select_{i}", on="mouseover", fields=["group_value"], nearest=False)
+            highlight = alt.selection_point(
+                name=f"select_{i}", on="mouseover", clear="mouseout", fields=["group_value"], nearest=False
+            )
 
             # Explicitly copy the subset to avoid data sharing issues in some Altair versions
             local_df = sub.copy()

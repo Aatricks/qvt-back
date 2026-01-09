@@ -115,10 +115,10 @@ class DimensionMeanStdScatterStrategy(IVisualizationStrategy):
         color_encoding = alt.Color("mean_score:Q", title="Score moyen", scale=alt.Scale(scheme=color_scheme))
         highlight = None
         if segment_field:
-            highlight = alt.selection_point(on="mouseover", fields=[segment_field], nearest=False)
+            highlight = alt.selection_point(on="mouseover", clear="mouseout", fields=[segment_field], nearest=False)
             color_encoding = alt.Color(f"{segment_field}:N", title=segment_field)
         else:
-            highlight = alt.selection_point(on="mouseover", fields=["dimension_label"], nearest=False)
+            highlight = alt.selection_point(on="mouseover", clear="mouseout", fields=["dimension_label"], nearest=False)
 
         tooltip = [
             "dimension_label",

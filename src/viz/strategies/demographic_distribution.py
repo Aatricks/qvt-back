@@ -137,10 +137,10 @@ class DemographicDistributionStrategy(IVisualizationStrategy):
         color = alt.value("#4F46E5")
         highlight = None
         if segment_field:
-            highlight = alt.selection_point(on="mouseover", fields=[segment_field], nearest=False)
+            highlight = alt.selection_point(on="mouseover", clear="mouseout", fields=[segment_field], nearest=False)
             color = alt.Color(f"{segment_field}:N", title=None, legend=alt.Legend(orient="bottom", titleFontSize=10, labelFontSize=9))
         else:
-            highlight = alt.selection_point(on="mouseover", fields=[field], nearest=False)
+            highlight = alt.selection_point(on="mouseover", clear="mouseout", fields=[field], nearest=False)
 
         tooltip = [alt.Tooltip(field, title="Catégorie"), alt.Tooltip("count()", title="Effectif")]
         if segment_field: 

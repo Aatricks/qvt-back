@@ -163,7 +163,7 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
 
         if segment_field:
             # Selection for dynamic highlighting on hover
-            highlight = alt.selection_point(on="mouseover", fields=[segment_field], nearest=False)
+            highlight = alt.selection_point(on="mouseover", clear="mouseout", fields=[segment_field], nearest=False)
 
             bars = base.mark_bar(size=12, cornerRadiusTopRight=2, cornerRadiusBottomRight=2).encode(
                 y=y,
@@ -186,7 +186,7 @@ class DimensionCIBarsStrategy(IVisualizationStrategy):
             
             chart = (bars + eb).properties(height={"step": 24})
         else:
-            highlight = alt.selection_point(on="mouseover", fields=["dimension_label"], nearest=False)
+            highlight = alt.selection_point(on="mouseover", clear="mouseout", fields=["dimension_label"], nearest=False)
 
             bars = base.mark_bar(size=16, cornerRadiusTopRight=3, cornerRadiusBottomRight=3).encode(
                 y=y,

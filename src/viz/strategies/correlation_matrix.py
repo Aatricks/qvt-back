@@ -1,10 +1,9 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import altair as alt
 import pandas as pd
 import scipy.cluster.hierarchy as sch
 
-from src.config.observability import log_event
 from src.services.qvt_metrics import compute_prefix_scores, prefix_label
 from src.services.survey_utils import DEMO_VALUE_MAPPING
 from src.viz.base import IVisualizationStrategy
@@ -85,7 +84,7 @@ class CorrelationMatrixStrategy(IVisualizationStrategy):
                 corr[facet_field] = val
                 all_corr.append(corr)
             if not all_corr:
-                raise ValueError(f"Insufficient data in groups for faceted correlation")
+                raise ValueError("Insufficient data in groups for faceted correlation")
             corr_reset = pd.concat(all_corr)
             all_cols = [c for c in numeric.columns if c != facet_field]
         else:
@@ -106,9 +105,15 @@ class CorrelationMatrixStrategy(IVisualizationStrategy):
 
         apply_theme()
 
-        highlight = alt.selection_point(on="mouseover", fields=["metric_x", "metric_y"], nearest=False)
-        row_highlight = alt.selection_point(on="mouseover", fields=["metric_y"], nearest=False, name="row_h")
-        col_highlight = alt.selection_point(on="mouseover", fields=["metric_x"], nearest=False, name="col_h")
+        highlight = alt.selection_point(
+            on="mouseover", clear="mouseout", fields=["metric_x", "metric_y"], nearest=False
+        )
+        row_highlight = alt.selection_point(
+            on="mouseover", clear="mouseout", fields=["metric_y"], nearest=False, name="row_h"
+        )
+        col_highlight = alt.selection_point(
+            on="mouseover", clear="mouseout", fields=["metric_x"], nearest=False, name="col_h"
+        )
 
         base = alt.Chart(corr_reset).encode(
             x=alt.X("metric_x:N", sort=ordered_labels, title=None),

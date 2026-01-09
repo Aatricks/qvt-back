@@ -124,7 +124,9 @@ class LikertDistributionStrategy(IVisualizationStrategy):
 
         color_scale = alt.Scale(domain=[1, 2, 3, 4, 5], range=LIKERT_COLORS)
 
-        highlight = alt.selection_point(on="mouseover", fields=["display_label"], nearest=False)
+        highlight = alt.selection_point(
+            on="mouseover", clear="mouseout", fields=["display_label"], nearest=False
+        )
 
         chart = (
             base.transform_filter(filter_cond)

@@ -162,7 +162,7 @@ class ActionPriorityIndexStrategy(IVisualizationStrategy):
 
         is_segmented = out["segment"].nunique() > 1
         highlight_field = "segment" if is_segmented else "dimension_label"
-        highlight = alt.selection_point(on="mouseover", fields=[highlight_field], nearest=False)
+        highlight = alt.selection_point(on="mouseover", clear="mouseout", fields=[highlight_field], nearest=False)
 
         y = alt.Y(
             "dimension_label:N",

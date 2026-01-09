@@ -140,7 +140,7 @@ class ClusteringProfileStrategy(IVisualizationStrategy):
             range=["#4F46E5", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"]
         )
 
-        highlight = alt.selection_point(on="mouseover", fields=["cluster_label"], nearest=False)
+        highlight = alt.selection_point(on="mouseover", clear="mouseout", fields=["cluster_label"], nearest=False)
 
         # --- CHART 1: Profile Signature (Line) ---
         profile_line = alt.Chart(profile_long).mark_line(
