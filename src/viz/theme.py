@@ -2,11 +2,7 @@ import altair as alt
 
 def apply_theme() -> None:
     """Configures Altair with a professional, modern theme matching the app's UI."""
-    
-    # Modern professional colors matching the UI overhaul
-    # Primary indigo: #4F46E5 -> RGB (79, 70, 229)
-    # Background slate: #F8FAFC
-    
+
     FONT = "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
     PRIMARY_COLOR = "#4F46E5"
     AXIS_COLOR = "#94A3B8"  # slate-400
